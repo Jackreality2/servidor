@@ -90,20 +90,18 @@ async function startAtrinoBot() {
         console.log('📦 Carregando sessão existente da pasta "auth_info"...');
     }
 
-    const { version } = await fetchLatestBaileysVersion();
-
-    // --- CONFIGURAÇÃO CORRIGIDA PARA EVITAR REJEIÇÃO DO WHATSAPP WEB ---
+    // --- CONFIGURAÇÃO CAMUFLADA PARA EVITAR REJEIÇÃO ---
     const sock = makeWASocket({
-        version: version || [2, 3000, 1017531287], // Força última versão estável se falhar
+        version: [2, 3000, 1015970092], // Força uma versão estável e aceita do WhatsApp Web
         logger,
         auth: state,
         printQRInTerminal: false,
-        browser: ['Ubuntu', 'Chrome', '20.0.04'], // Simula um navegador comum para evitar bloqueios de login
-        connectTimeoutMs: 120000, // Aumentado para 2 minutos para evitar timeout em conexões lentas
-        keepAliveIntervalMs: 30000,
+        browser: ['Windows', 'Chrome', '114.0.5735.199'], // Simula o Chrome no Windows (Evita travas em IPs de nuvem)
+        connectTimeoutMs: 180000, // Aumentado para 3 minutos para dar estabilidade no Render
+        keepAliveIntervalMs: 60000,
         markOnline: true,
         shouldSyncHistoryMessage: () => false,
-        receivedPendingNotifications: true, 
+        receivedPendingNotifications: false, // Evita ler notificações antigas de uma vez, reduzindo o risco de travar no login
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -221,7 +219,7 @@ async function startAtrinoBot() {
                     hobbies: hobbies || 'Não informado'
                 };
                 fs.writeFileSync('./perfis.json', JSON.stringify(perfis, null, 2));
-                return await sock.sendMessage(jid, { text: '✅ *Perfil atualizado com sucesso!* Digite !perfil para ver seu cartão.' });
+                return await sock.sendMessage(jid, { text: '✅ *Perfil updated com sucesso!* Digite !perfil para ver seu cartão.' });
             }
         }
 
