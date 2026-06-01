@@ -24,6 +24,7 @@ let botSilenciado = false;
 let perfis = fs.existsSync('./perfis.json') ? JSON.parse(fs.readFileSync('./perfis.json')) : {};
 let pontosFilmes = fs.existsSync('./pontos_filmes.json') ? JSON.parse(fs.readFileSync('./pontos_filmes.json')) : {};
 let jogosAtivos = {};
+let qrAtual = null; // 🚀 Variável global para armazenar o QR Code ativo no Render
 
 const filmes = [
     { nome: 'O Rei Leão', emojis: '🦁👑🌅' },
@@ -38,12 +39,43 @@ const filmes = [
     { nome: 'Toy Story', emojis: '🧸🤠🚀' }
 ];
 
-// --- SISTEMA ANTI-HIBERNAÇÃO (KEEP-ALIVE) ---
+// --- SISTEMA ANTI-HIBERNAÇÃO E SERVIDOR DE QR CODE VIA WEB ---
 http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Atrino Bot: Monitoramento Ativo.\n');
+    // Caso o bot já esteja conectado e ativo
+    if (!qrAtual) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(`
+            <html>
+                <head><title>Atrino Bot - Status</title></head>
+                <body style="font-family: Arial, sans-serif; text-align: center; margin-top: 80px; background-color: #0d1117; color: #58a6ff;">
+                    <h1>🚀 Atrino Bot: Conectado e Ativo!</h1>
+                    <p style="color: #8b949e;">O monitoramento e o keep-alive estão rodando perfeitamente.</p>
+                </body>
+            </html>
+        `);
+        return;
+    }
+
+    // Caso o bot precise de escaneamento (Gera página com auto-refresh de 5 segundos)
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`
+        <html>
+            <head>
+                <title>Atrino Bot - Conexão</title>
+                <meta http-equiv="refresh" content="5">
+            </head>
+            <body style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #111; color: #fff;">
+                <h1 style="color: #25D366;">Escaneie o QR Code do Atrino Bot</h1>
+                <p>Esta página atualiza sozinha a cada 5 segundos para manter o código sincronizado!</p>
+                <div style="margin-top: 30px;">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrAtual)}" style="border: 10px solid white; border-radius: 10px; box-shadow: 0px 0px 20px rgba(255,255,255,0.2);" />
+                </div>
+                <p style="margin-top: 20px; color: #aaa; font-size: 14px;">Abra o WhatsApp > Aparelhos Conectados > Conectar um aparelho</p>
+            </body>
+        </html>
+    `);
 }).listen(7860, '0.0.0.0', () => {
-    console.log('🛰️ Servidor Keep-Alive rodando na porta 7860');
+    console.log('🛰️ Servidor Keep-Alive e Web-QR rodando na porta 7860');
     // Auto-ping interno para evitar hibernação do processo por inatividade
     setInterval(() => {
         http.get('http://localhost:7860').on('error', () => {});
@@ -125,14 +157,17 @@ async function startAtrinoBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
+            qrAtual = qr; // 🚀 Alimenta a variável para renderizar na página Web do Render
             const qrLink = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(qr);
-            console.log('\n🔗 LINK DO QR CODE: ' + qrLink + '\n');
+            console.log('\n🔗 LINK ATUALIZADO DO QR CODE: ' + qrLink + '\n');
             qrcode.generate(qr, { small: false });
         }
         if (connection === 'open') {
+            qrAtual = null; // 🎉 Conectado! Limpa o QR Code para mudar o estado da página web
             console.log('\n✅ ATRINO BOT ONLINE!\n');
         }
         if (connection === 'close') {
+            qrAtual = null;
             const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
             console.log(`🔌 Conexão encerrada. Razão: ${reason}`);
             const shouldReconnect = reason !== DisconnectReason.loggedOut;
@@ -186,7 +221,7 @@ async function startAtrinoBot() {
                     hobbies: hobbies || 'Não informado'
                 };
                 fs.writeFileSync('./perfis.json', JSON.stringify(perfis, null, 2));
-                return await sock.sendMessage(jid, { text: '✅ *Perfil updated com sucesso!* Digite !perfil para ver seu cartão.' });
+                return await sock.sendMessage(jid, { text: '✅ *Perfil atualizado com sucesso!* Digite !perfil para ver seu cartão.' });
             }
         }
 
