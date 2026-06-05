@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, jidNormalizedUser } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, jidNormalizedUser, downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const P = require('pino');
 const qrcode = require('qrcode-terminal');
@@ -108,7 +108,6 @@ async function startAtrinoBot() {
         logger,
         auth: state,
         printQRInTerminal: false,
-        // Alinhado com o ecossistema padrão do Chrome para parear sem rejeição no celular
         browser: ['Mac OS', 'Chrome', '121.0.0.0'], 
         connectTimeoutMs: 120000, 
         keepAliveIntervalMs: 30000,
@@ -230,7 +229,7 @@ async function startAtrinoBot() {
                     hobbies: hobbies || 'Não informado'
                 };
                 fs.writeFileSync('./perfis.json', JSON.stringify(perfis, null, 2));
-                return await sock.sendMessage(jid, { text: '✅ *Perfil atualizado com sucesso!* Digite !perfil para ver seu cartão.' });
+                return await sock.sendMessage(jid, { text: '✅ *Perfil updated com sucesso!* Digite !perfil para ver seu cartão.' });
             }
         }
 
@@ -376,28 +375,48 @@ async function startAtrinoBot() {
 
             case 's':
             case 'sticker':
-                const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                const imgS = m.message.imageMessage || quotedS?.imageMessage;
-                if (imgS) {
-                    const stream = await downloadContentFromMessage(imgS, 'image');
-                    let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                    const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Garibaldo356', type: StickerTypes.FULL });
-                    await sock.sendMessage(jid, await sticker.toMessage());
-                    await sock.sendMessage(jid, { delete: m.key });
+                try {
+                    const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const imgS = m.message.imageMessage || quotedS?.imageMessage;
+                    if (imgS) {
+                        const stream = await downloadContentFromMessage(imgS, 'image');
+                        let buffer = Buffer.from([]);
+                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                        
+                        const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Garibaldo356', type: StickerTypes.FULL });
+                        await sock.sendMessage(jid, await sticker.toMessage());
+                        
+                        try {
+                            await sock.sendMessage(jid, { delete: m.key });
+                        } catch (delErr) {
+                            console.log('Erro ao deletar imagem (Verifique se o bot é Admin):', delErr.message);
+                        }
+                    }
+                } catch (stkErr) {
+                    console.error('Erro no comando de sticker:', stkErr);
                 }
                 break;
 
             case 'a':
-                const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                const vidA = m.message.videoMessage || quotedA?.videoMessage;
-                if (vidA && vidA.seconds <= 10) {
-                    const stream = await downloadContentFromMessage(vidA, 'video');
-                    let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                    const sticker = new Sticker(buffer, { pack: 'Animado', author: 'Garibaldo356', type: StickerTypes.FULL, quality: 30 });
-                    await sock.sendMessage(jid, await sticker.toMessage());
-                    await sock.sendMessage(jid, { delete: m.key });
+                try {
+                    const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const vidA = m.message.videoMessage || quotedA?.videoMessage;
+                    if (vidA && vidA.seconds <= 10) {
+                        const stream = await downloadContentFromMessage(vidA, 'video');
+                        let buffer = Buffer.from([]);
+                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                        
+                        const sticker = new Sticker(buffer, { pack: 'Animado', author: 'Garibaldo356', type: StickerTypes.FULL, quality: 30 });
+                        await sock.sendMessage(jid, await sticker.toMessage());
+                        
+                        try {
+                            await sock.sendMessage(jid, { delete: m.key });
+                        } catch (delErr) {
+                            console.log('Erro ao deletar vídeo (Verifique se o bot é Admin):', delErr.message);
+                        }
+                    }
+                } catch (gifErr) {
+                    console.error('Erro no comando de sticker animado:', gifErr);
                 }
                 break;
 
