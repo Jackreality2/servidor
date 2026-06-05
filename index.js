@@ -202,6 +202,7 @@ async function startAtrinoBot() {
                 const menu = `╭─── [ ATRINO BOT ] ───╮
 │
 │ 🧑‍🤝‍🧑 *Membros:*
+│ ➥ !!play
 │ ➥ !s - Figurinha (Foto)
 │
 │ 👮 *Admin:*
