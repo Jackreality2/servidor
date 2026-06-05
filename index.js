@@ -5,7 +5,6 @@ const qrcode = require('qrcode-terminal');
 const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 const cron = require('node-cron'); 
 const fs = require('fs');
-const { exec } = require('child_process');
 const http = require('http');
 const path = require('path');
 
@@ -90,7 +89,7 @@ async function startAtrinoBot() {
         console.log('📦 Carregando sessão existente da pasta "auth_info"...');
     }
 
-    // --- CONFIGURAÇÃO CORRIGIDA CONTRA BLOQUEIOS ---
+    // --- CONFIGURAÇÃO CONTRA BLOQUEIOS ---
     const sock = makeWASocket({
         logger,
         auth: state,
@@ -173,7 +172,13 @@ async function startAtrinoBot() {
         if (!jid.endsWith('@g.us')) return; 
         const sender = m.key.participant || m.key.remoteJid;
         
-        if (mutados.includes(sender)) return await sock.sendMessage(jid, { delete: m.key });
+        if (mutados.includes(sender)) {
+            try {
+                return await sock.sendMessage(jid, { delete: m.key });
+            } catch {
+                return;
+            }
+        }
 
         const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || "");
 
@@ -244,21 +249,16 @@ async function startAtrinoBot() {
                         urlDoSoundcloud = resultados[0].url;
                     }
 
-                    // Obtém as informações e a stream de áudio progressiva
                     const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
                     const streamDeAudio = await musicaInfo.downloadProgressive();
                     
-                    // Cria o caminho do arquivo temporário
                     const nomeDoArquivo = path.join(__dirname, `${Date.now()}.mp3`);
                     const writeStream = fs.createWriteStream(nomeDoArquivo);
                     
-                    // Transmite os dados para o arquivo local
                     streamDeAudio.pipe(writeStream);
 
-                    // Espera o download terminar 100% no disco antes de enviar
                     writeStream.on('finish', async () => {
                         try {
-                            // Verifica se o arquivo realmente tem conteúdo e não está zerado
                             const stats = fs.statSync(nomeDoArquivo);
                             if (stats.size === 0) {
                                 throw new Error("Arquivo baixado está vazio.");
@@ -266,21 +266,18 @@ async function startAtrinoBot() {
 
                             await sock.sendMessage(jid, { text: `🎧 Enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
 
-                            // Lendo o arquivo completo como Buffer para evitar falhas de transmissão
                             const audioBuffer = fs.readFileSync(nomeDoArquivo);
 
-                            // Enviando o arquivo convertido corretamente para o formato que o WhatsApp aceita
                             await sock.sendMessage(jid, { 
                                 audio: audioBuffer, 
-                                mimetype: 'audio/mpeg', // Mimetype correto para arquivos MP3 funcionarem em todos os dispositivos
-                                ptt: true // Define como nota de voz (gravação) para rodar direto no player do celular
+                                mimetype: 'audio/mpeg', 
+                                ptt: true 
                             }, { quoted: m });
 
                         } catch (sendErr) {
                             console.error('Erro ao enviar o arquivo de áudio:', sendErr);
                             await sock.sendMessage(jid, { text: '❌ Não foi possível processar ou enviar este áudio.' }, { quoted: m });
                         } finally {
-                            // Deleta o arquivo temporário com segurança
                             if (fs.existsSync(nomeDoArquivo)) {
                                 fs.unlinkSync(nomeDoArquivo);
                             }
@@ -300,6 +297,7 @@ async function startAtrinoBot() {
                     await sock.sendMessage(jid, { text: '❌ Erro ao processar o comando !play.' }, { quoted: m });
                 }
                 break;
+
             case 's':
             case 'sticker':
                 try {
@@ -324,7 +322,6 @@ async function startAtrinoBot() {
                 }
                 break;
 
-            // --- DEPOIS DAQUI TODOS EXIGEM ADMIN ---
             case 'tornaadm':
                 if (!isSenderAdmin) return;
                 const userToAdmin = getMention();
