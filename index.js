@@ -209,6 +209,11 @@ async function startAtrinoBot() {
 
         switch (command) {
             case 'menu':
+                // 🔒 Nova trava: Se não for admin ou dono, o bot ignora ou avisa
+                if (!isSenderAdmin) {
+                    return await sock.sendMessage(jid, { text: '❌ Apenas administradores podem ver o menu!' }, { quoted: m });
+                }
+
                 const menu = `╭─── [ ATRINO BOT ] ───╮
 │
 │ 🧑‍🤝‍🧑 *Membros:*
