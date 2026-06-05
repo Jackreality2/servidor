@@ -230,7 +230,7 @@ async function startAtrinoBot() {
             case 'play':
                 try {
                     const busca = args.join(' ');
-                    if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link do SoundCloud! Exemplo: !play Nome da Musica' }, { quoted: m });
+                    if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link! Exemplo: !play Nome da Musica' }, { quoted: m });
 
                     await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}" no SoundCloud...` }, { quoted: m });
 
@@ -239,44 +239,67 @@ async function startAtrinoBot() {
                     if (!busca.startsWith('https://')) {
                         const resultados = await client.search(busca, 'track');
                         if (resultados.length === 0) {
-                            return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome no SoundCloud.' }, { quoted: m });
+                            return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome.' }, { quoted: m });
                         }
                         urlDoSoundcloud = resultados[0].url;
                     }
 
+                    // Obtém as informações e a stream de áudio progressiva
                     const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
                     const streamDeAudio = await musicaInfo.downloadProgressive();
                     
+                    // Cria o caminho do arquivo temporário
                     const nomeDoArquivo = path.join(__dirname, `${Date.now()}.mp3`);
                     const writeStream = fs.createWriteStream(nomeDoArquivo);
                     
+                    // Transmite os dados para o arquivo local
                     streamDeAudio.pipe(writeStream);
 
+                    // Espera o download terminar 100% no disco antes de enviar
                     writeStream.on('finish', async () => {
-                        await sock.sendMessage(jid, { text: `🎧 Enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
-
-                        await sock.sendMessage(jid, { 
-                            audio: { url: nomeDoArquivo }, 
-                            mimetype: 'audio/mp4', 
-                            ptt: true 
-                        }, { quoted: m });
-
                         try {
-                            fs.unlinkSync(nomeDoArquivo);
-                        } catch (unlErr) {}
+                            // Verifica se o arquivo realmente tem conteúdo e não está zerado
+                            const stats = fs.statSync(nomeDoArquivo);
+                            if (stats.size === 0) {
+                                throw new Error("Arquivo baixado está vazio.");
+                            }
+
+                            await sock.sendMessage(jid, { text: `🎧 Enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
+
+                            // Lendo o arquivo completo como Buffer para evitar falhas de transmissão
+                            const audioBuffer = fs.readFileSync(nomeDoArquivo);
+
+                            // Enviando o arquivo convertido corretamente para o formato que o WhatsApp aceita
+                            await sock.sendMessage(jid, { 
+                                audio: audioBuffer, 
+                                mimetype: 'audio/mpeg', // Mimetype correto para arquivos MP3 funcionarem em todos os dispositivos
+                                ptt: true // Define como nota de voz (gravação) para rodar direto no player do celular
+                            }, { quoted: m });
+
+                        } catch (sendErr) {
+                            console.error('Erro ao enviar o arquivo de áudio:', sendErr);
+                            await sock.sendMessage(jid, { text: '❌ Não foi possível processar ou enviar este áudio.' }, { quoted: m });
+                        } finally {
+                            // Deleta o arquivo temporário com segurança
+                            if (fs.existsSync(nomeDoArquivo)) {
+                                fs.unlinkSync(nomeDoArquivo);
+                            }
+                        }
                     });
 
                     writeStream.on('error', async (err) => {
-                        console.error('Erro ao baixar áudio:', err);
-                        await sock.sendMessage(jid, { text: '❌ Ocorreu um erro ao baixar o áudio.' }, { quoted: m });
+                        console.error('Erro durante a gravação do áudio:', err);
+                        await sock.sendMessage(jid, { text: '❌ Ocorreu um erro ao salvar o áudio no servidor.' }, { quoted: m });
+                        if (fs.existsSync(nomeDoArquivo)) {
+                            fs.unlinkSync(nomeDoArquivo);
+                        }
                     });
 
                 } catch (playErr) {
-                    console.error('Erro no comando play:', playErr);
+                    console.error('Erro geral no comando play:', playErr);
                     await sock.sendMessage(jid, { text: '❌ Erro ao processar o comando !play.' }, { quoted: m });
                 }
                 break;
-
             case 's':
             case 'sticker':
                 try {
