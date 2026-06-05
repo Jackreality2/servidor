@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadContentFromMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, jidNormalizedUser } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const P = require('pino');
 const qrcode = require('qrcode-terminal');
@@ -7,7 +7,6 @@ const cron = require('node-cron');
 const fs = require('fs');
 const { exec } = require('child_process');
 const http = require('http');
-const axios = require('axios'); 
 const Jimp = require('jimp'); 
 
 const logger = P({ level: 'silent' });
@@ -24,7 +23,7 @@ let botSilenciado = false;
 let perfis = fs.existsSync('./perfis.json') ? JSON.parse(fs.readFileSync('./perfis.json')) : {};
 let pontosFilmes = fs.existsSync('./pontos_filmes.json') ? JSON.parse(fs.readFileSync('./pontos_filmes.json')) : {};
 let jogosAtivos = {};
-let qrAtual = null; // 🚀 Variável global para armazenar o QR Code ativo no Render
+let qrAtual = null; // 🚀 Armazena o QR Code ativo para renderizar na Web do Render
 
 const filmes = [
     { nome: 'O Rei Leão', emojis: '🦁👑🌅' },
@@ -39,17 +38,28 @@ const filmes = [
     { nome: 'Toy Story', emojis: '🧸🤠🚀' }
 ];
 
-// --- SISTEMA ANTI-HIBERNAÇÃO E SERVIDOR DE QR CODE VIA WEB ---
+// --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
+const PORT = parseInt(process.env.PORT, 10) || 7860;
+
+// --- SERVIDOR WEB DE MONITORAMENTO E QR CODE ---
 http.createServer((req, res) => {
     // Caso o bot já esteja conectado e ativo
     if (!qrAtual) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
             <html>
-                <head><title>Atrino Bot - Status</title></head>
-                <body style="font-family: Arial, sans-serif; text-align: center; margin-top: 80px; background-color: #0d1117; color: #58a6ff;">
-                    <h1>🚀 Atrino Bot: Conectado e Ativo!</h1>
-                    <p style="color: #8b949e;">O monitoramento e o keep-alive estão rodando perfeitamente.</p>
+                <head>
+                    <title>Atrino Bot - Status</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; margin-top: 80px; background-color: #0f0c1b; color: #00ffcc; }
+                        .card { background: #17142b; display: inline-block; padding: 30px; border-radius: 15px; border: 1px solid #3d3475; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h1>🚀 Atrino Bot: Conectado e Ativo!</h1>
+                        <p style="color: #b3b0cb;">O monitoramento e o keep-alive no Render estão rodando perfeitamente.</p>
+                    </div>
                 </body>
             </html>
         `);
@@ -63,45 +73,48 @@ http.createServer((req, res) => {
             <head>
                 <title>Atrino Bot - Conexão</title>
                 <meta http-equiv="refresh" content="5">
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #111; color: #fff; }
+                    .qr-container { margin-top: 30px; }
+                </style>
             </head>
-            <body style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #111; color: #fff;">
+            <body>
                 <h1 style="color: #25D366;">Escaneie o QR Code do Atrino Bot</h1>
                 <p>Esta página atualiza sozinha a cada 5 segundos para manter o código sincronizado!</p>
-                <div style="margin-top: 30px;">
+                <div class="qr-container">
                     <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrAtual)}" style="border: 10px solid white; border-radius: 10px; box-shadow: 0px 0px 20px rgba(255,255,255,0.2);" />
                 </div>
                 <p style="margin-top: 20px; color: #aaa; font-size: 14px;">Abra o WhatsApp > Aparelhos Conectados > Conectar um aparelho</p>
             </body>
         </html>
     `);
-}).listen(7860, '0.0.0.0', () => {
-    console.log('🛰️ Servidor Keep-Alive e Web-QR rodando na porta 7860');
-    // Auto-ping interno para evitar hibernação do processo por inatividade
+}).listen(PORT, '0.0.0.0', () => {
+    console.log(`🛰️ Servidor Keep-Alive e Web-QR ativo na porta ${PORT}`);
+    // Auto-ping interno para evitar que o Render derrube o processo por inatividade
     setInterval(() => {
-        http.get('http://localhost:7860').on('error', () => {});
-    }, 120000); // 2 minutos
+        http.get(`http://localhost:${PORT}`).on('error', () => {});
+    }, 60000); // 1 minuto
 });
 
 async function startAtrinoBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
     
-    // Verifica se já existem credenciais salvas para informar no log
     if (state.creds && state.creds.signedRegistrationInfo) {
         console.log('📦 Carregando sessão existente da pasta "auth_info"...');
     }
 
-    // --- CONFIGURAÇÃO CAMUFLADA PARA EVITAR REJEIÇÃO ---
+    // --- CONFIGURAÇÃO CORRIGIDA CONTRA BLOQUEIOS ---
     const sock = makeWASocket({
-        version: [2, 3000, 1015970092], // Força uma versão estável e aceita do WhatsApp Web
         logger,
         auth: state,
         printQRInTerminal: false,
-        browser: ['Windows', 'Chrome', '114.0.5735.199'], // Simula o Chrome no Windows (Evita travas em IPs de nuvem)
-        connectTimeoutMs: 180000, // Aumentado para 3 minutos para dar estabilidade no Render
-        keepAliveIntervalMs: 60000,
+        // Alinhado com o ecossistema padrão do Chrome para parear sem rejeição no celular
+        browser: ['Mac OS', 'Chrome', '121.0.0.0'], 
+        connectTimeoutMs: 120000, 
+        keepAliveIntervalMs: 30000,
         markOnline: true,
         shouldSyncHistoryMessage: () => false,
-        receivedPendingNotifications: false, // Evita ler notificações antigas de uma vez, reduzindo o risco de travar no login
+        receivedPendingNotifications: false, 
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -155,14 +168,14 @@ async function startAtrinoBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
-            qrAtual = qr; // 🚀 Alimenta a variável para renderizar na página Web do Render
+            qrAtual = qr; 
             const qrLink = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(qr);
-            console.log('\n🔗 LINK ATUALIZADO DO QR CODE: ' + qrLink + '\n');
+            console.log('\n🔗 LINK DO QR CODE NO RENDER: ' + qrLink + '\n');
             qrcode.generate(qr, { small: false });
         }
         if (connection === 'open') {
-            qrAtual = null; // 🎉 Conectado! Limpa o QR Code para mudar o estado da página web
-            console.log('\n✅ ATRINO BOT ONLINE!\n');
+            qrAtual = null; 
+            console.log('\n✅ ATRINO BOT ONLINE NO RENDER!\n');
         }
         if (connection === 'close') {
             qrAtual = null;
@@ -174,7 +187,7 @@ async function startAtrinoBot() {
                 console.log('🔄 Tentando reconectar automaticamente...'); 
                 startAtrinoBot(); 
             } else {
-                console.log('❌ Sessão encerrada permanentemente. Você precisará escanear o QR Code novamente.');
+                console.log('❌ Sessão encerrada permanentemente. É necessário ler o QR Code de novo.');
             }
         }
     });
@@ -184,14 +197,13 @@ async function startAtrinoBot() {
         if (!m.message || m.key.fromMe) return;
 
         const jid = m.key.remoteJid;
-        if (!jid.endsWith('@g.us')) return; // Bloqueia respostas em privados
+        if (!jid.endsWith('@g.us')) return; 
         const sender = m.key.participant || m.key.remoteJid;
         
         if (mutados.includes(sender)) return await sock.sendMessage(jid, { delete: m.key });
 
         const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || "");
         
-        // --- LÓGICA DO JOGO DE FILMES (CHECA ACERTO) ---
         if (jogosAtivos[jid] && body) {
             const jogo = jogosAtivos[jid];
             if (body.toLowerCase().trim() === jogo.filme.nome.toLowerCase().trim()) {
@@ -204,7 +216,6 @@ async function startAtrinoBot() {
             }
         }
 
-        // --- SISTEMA DE EDIÇÃO DE PERFIL ---
         if (body.toLowerCase().includes('!editapronto')) {
             const idade = body.match(/Idade:\s*([^\n\r]*)/i)?.[1]?.trim();
             const sexualidade = body.match(/Sexualidade:\s*([^\n\r]*)/i)?.[1]?.trim();
@@ -219,7 +230,7 @@ async function startAtrinoBot() {
                     hobbies: hobbies || 'Não informado'
                 };
                 fs.writeFileSync('./perfis.json', JSON.stringify(perfis, null, 2));
-                return await sock.sendMessage(jid, { text: '✅ *Perfil updated com sucesso!* Digite !perfil para ver seu cartão.' });
+                return await sock.sendMessage(jid, { text: '✅ *Perfil atualizado com sucesso!* Digite !perfil para ver seu cartão.' });
             }
         }
 
@@ -308,8 +319,7 @@ async function startAtrinoBot() {
                 if (body.toLowerCase().includes('@eu') && !mentions.includes(sender)) {
                     mentions.push(sender);
                 }
-
-                if (mentions.length !== 2) return sock.sendMessage(jid, { text: '❌ Mencione 2 pessoas (ou use @eu e mencione outra): !mat @eu @pessoa' });
+                if (mentions.length !== 2) return sock.sendMessage(jid, { text: '❌ Mencione 2 pessoas: !mat @eu @pessoa' });
                 
                 try {
                     await sock.sendMessage(jid, { text: '❤️ *Montando o clima amoroso...*' });
@@ -469,15 +479,7 @@ async function startAtrinoBot() {
                     ppPerfil = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png';
                 }
 
-                const textoPerfil = `╭─── [ 👤 *PERFIL DO USUÁRIO* ] ───╮
-│
-│ 👤 *Nome:* @${target.split('@')[0]}
-│ 🎂 *Idade:* ${perfil.idade}
-│ 🌈 *Sexualidade:* ${perfil.sexualidade}
-│ 💍 *Estado Civil:* ${perfil.estadoCivil}
-│ 🎨 *Hobbies:* ${perfil.hobbies}
-│
-╰──────────────────────────╯`;
+                const textoPerfil = `╭─── [ 👤 *PERFIL DO USUÁRIO* ] ───╮\n│\n│ 👤 *Nome:* @${target.split('@')[0]}\n│ 🎂 *Idade:* ${perfil.idade}\n│ 🌈 *Sexualidade:* ${perfil.sexualidade}\n│ 💍 *Estado Civil:* ${perfil.estadoCivil}\n│ 🎨 *Hobbies:* ${perfil.hobbies}\n│\n╰──────────────────────────╯`;
 
                 await sock.sendMessage(jid, { 
                     image: { url: ppPerfil }, 
