@@ -7,6 +7,11 @@ const cron = require('node-cron');
 const fs = require('fs');
 const { exec } = require('child_process');
 const http = require('http');
+const path = require('path');
+
+// --- INTEGRAÇÃO DO SOUNDCLOUD ---
+const SoundCloud = require("soundcloud-scraper");
+const client = new SoundCloud.Client();
 
 const logger = P({ level: 'silent' });
 
@@ -202,7 +207,7 @@ async function startAtrinoBot() {
                 const menu = `╭─── [ ATRINO BOT ] ───╮
 │
 │ 🧑‍🤝‍🧑 *Membros:*
-│ ➥ !!play
+│ ➥ !play [nome] - Tocar música
 │ ➥ !s - Figurinha (Foto)
 │
 │ 👮 *Admin:*
@@ -220,6 +225,56 @@ async function startAtrinoBot() {
 │
 ╰───────────────────╯`;
                 await sock.sendMessage(jid, { text: menu }, { quoted: m });
+                break;
+
+            case 'play':
+                try {
+                    const busca = args.join(' ');
+                    if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link do SoundCloud! Exemplo: !play Nome da Musica' }, { quoted: m });
+
+                    await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}" no SoundCloud...` }, { quoted: m });
+
+                    let urlDoSoundcloud = busca;
+
+                    if (!busca.startsWith('https://')) {
+                        const resultados = await client.search(busca, 'track');
+                        if (resultados.length === 0) {
+                            return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome no SoundCloud.' }, { quoted: m });
+                        }
+                        urlDoSoundcloud = resultados[0].url;
+                    }
+
+                    const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
+                    const streamDeAudio = await musicaInfo.downloadProgressive();
+                    
+                    const nomeDoArquivo = path.join(__dirname, `${Date.now()}.mp3`);
+                    const writeStream = fs.createWriteStream(nomeDoArquivo);
+                    
+                    streamDeAudio.pipe(writeStream);
+
+                    writeStream.on('finish', async () => {
+                        await sock.sendMessage(jid, { text: `🎧 Enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
+
+                        await sock.sendMessage(jid, { 
+                            audio: { url: nomeDoArquivo }, 
+                            mimetype: 'audio/mp4', 
+                            ptt: true 
+                        }, { quoted: m });
+
+                        try {
+                            fs.unlinkSync(nomeDoArquivo);
+                        } catch (unlErr) {}
+                    });
+
+                    writeStream.on('error', async (err) => {
+                        console.error('Erro ao baixar áudio:', err);
+                        await sock.sendMessage(jid, { text: '❌ Ocorreu um erro ao baixar o áudio.' }, { quoted: m });
+                    });
+
+                } catch (playErr) {
+                    console.error('Erro no comando play:', playErr);
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o comando !play.' }, { quoted: m });
+                }
                 break;
 
             case 's':
