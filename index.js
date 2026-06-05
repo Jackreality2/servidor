@@ -7,7 +7,6 @@ const cron = require('node-cron');
 const fs = require('fs');
 const { exec } = require('child_process');
 const http = require('http');
-const Jimp = require('jimp'); 
 
 const logger = P({ level: 'silent' });
 
@@ -18,25 +17,8 @@ const ID_DO_GRUPO = '120363425471646460@g.us';
  
 let mutados = [];
 let advertencias = {}; 
-let estaBaixando = false; 
 let botSilenciado = false;
-let perfis = fs.existsSync('./perfis.json') ? JSON.parse(fs.readFileSync('./perfis.json')) : {};
-let pontosFilmes = fs.existsSync('./pontos_filmes.json') ? JSON.parse(fs.readFileSync('./pontos_filmes.json')) : {};
-let jogosAtivos = {};
 let qrAtual = null; // 🚀 Armazena o QR Code ativo para renderizar na Web do Render
-
-const filmes = [
-    { nome: 'O Rei Leão', emojis: '🦁👑🌅' },
-    { nome: 'Titanic', emojis: '🚢🧊🌊' },
-    { nome: 'Homem Aranha', emojis: '🕷️🕸️🏙️' },
-    { nome: 'It a Coisa', emojis: '🤡🎈🎈' },
-    { nome: 'Harry Potter', emojis: '🧙‍♂️⚡👓' },
-    { nome: 'Jurassic Park', emojis: '🦖🌴🦕' },
-    { nome: 'Batman', emojis: '🦇🌃🌑' },
-    { nome: 'Star Wars', emojis: '🪐⚔️🚀' },
-    { nome: 'Procurando Nemo', emojis: '🐟🌊🤿' },
-    { nome: 'Toy Story', emojis: '🧸🤠🚀' }
-];
 
 // --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
 const PORT = parseInt(process.env.PORT, 10) || 7860;
@@ -118,19 +100,6 @@ async function startAtrinoBot() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    const iniciarRodada = async (sock, jid) => {
-        const filme = filmes[Math.floor(Math.random() * filmes.length)];
-        if (jogosAtivos[jid]?.intervalo) clearInterval(jogosAtivos[jid].intervalo);
-        
-        jogosAtivos[jid] = { 
-            filme, 
-            intervalo: setInterval(async () => {
-                await sock.sendMessage(jid, { text: `🎬 *QUAL É O FILME?*\n\nEmojis: ${filme.emojis}\n\nResponda com o nome correto!` });
-            }, 60000) 
-        };
-        await sock.sendMessage(jid, { text: `🎬 *QUAL É O FILME?*\n\nEmojis: ${filme.emojis}\n\nBoa sorte!` });
-    };
-
     // --- SISTEMA DE BOAS-VINDAS ---
     sock.ev.on('group-participants.update', async (anu) => {
         if (anu.action === 'add' && anu.id === ID_DO_GRUPO) {
@@ -202,36 +171,6 @@ async function startAtrinoBot() {
         if (mutados.includes(sender)) return await sock.sendMessage(jid, { delete: m.key });
 
         const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || "");
-        
-        if (jogosAtivos[jid] && body) {
-            const jogo = jogosAtivos[jid];
-            if (body.toLowerCase().trim() === jogo.filme.nome.toLowerCase().trim()) {
-                pontosFilmes[sender] = (pontosFilmes[sender] || 0) + 1;
-                fs.writeFileSync('./pontos_filmes.json', JSON.stringify(pontosFilmes, null, 2));
-                clearInterval(jogo.intervalo);
-                await sock.sendMessage(jid, { text: `🎉 *ACERTOU!* @${sender.split('@')[0]} ganhou 1 ponto.\n🎬 Filme: *${jogo.filme.nome}*\n\nPróxima rodada em instantes...`, mentions: [sender] });
-                setTimeout(() => { if (jogosAtivos[jid]) iniciarRodada(sock, jid); }, 3000);
-                return;
-            }
-        }
-
-        if (body.toLowerCase().includes('!editapronto')) {
-            const idade = body.match(/Idade:\s*([^\n\r]*)/i)?.[1]?.trim();
-            const sexualidade = body.match(/Sexualidade:\s*([^\n\r]*)/i)?.[1]?.trim();
-            const estadoCivil = body.match(/Estado\s*Civil:\s*([^\n\r]*)/i)?.[1]?.trim();
-            const hobbies = body.match(/Hobbies:\s*([^\n\r]*)/i)?.[1]?.trim();
-
-            if (idade || sexualidade || estadoCivil || hobbies) {
-                perfis[sender] = {
-                    idade: idade || 'Não informado',
-                    sexualidade: sexualidade || 'Não informado',
-                    estadoCivil: estadoCivil || 'Não informado',
-                    hobbies: hobbies || 'Não informado'
-                };
-                fs.writeFileSync('./perfis.json', JSON.stringify(perfis, null, 2));
-                return await sock.sendMessage(jid, { text: '✅ *Perfil updated com sucesso!* Digite !perfil para ver seu cartão.' });
-            }
-        }
 
         let isSenderAdmin = (sender === DONO_SUPREMO || sender === DONO_ADMIN);
         if (jid.endsWith('@g.us') && !isSenderAdmin) {
@@ -262,16 +201,8 @@ async function startAtrinoBot() {
             case 'menu':
                 const menu = `╭─── [ ATRINO BOT ] ───╮
 │
-│ 🧑‍🤝‍🧑 *Público:*
-│ ➥ !mat @user1 @user2 - Cupido
+│ 🧑‍🤝‍🧑 *Membros:*
 │ ➥ !s - Figurinha (Foto)
-│ ➥ !a - Figurinha (Vídeo)
-│ ➥ !play - Música (SoundCloud)
-│ ➥ !editar - Criar/Editar Perfil
-│ ➥ !perfil - Ver seu perfil ou de alguém
-│ ➥ !iniciar - Iniciar Jogo
-│ ➥ !stop - Parar Jogo
-│ ➥ !pontos - Ver seus pontos
 │
 │ 👮 *Admin:*
 │ ➥ !tornaadm @user - Dar Admin
@@ -290,54 +221,37 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: menu }, { quoted: m });
                 break;
 
-            case 'play':
-                if (!args.length || estaBaixando) return;
-                estaBaixando = true;
-                const query = args.join(' ');
-                await sock.sendMessage(jid, { text: `🎧 Buscando no SoundCloud: *${query}*...` });
-                const filePath = `./${Date.now()}.mp3`;
-                const cmd = `yt-dlp --no-check-certificates --max-filesize 50M "scsearch1:${query}" -x --audio-format mp3 -o "${filePath}"`;
-                exec(cmd, async (err) => {
-                    if (!err && fs.existsSync(filePath)) {
-                        await sock.sendMessage(jid, { audio: { url: filePath }, mimetype: 'audio/mp4' }, { quoted: m });
-                        fs.unlinkSync(filePath);
-                    } else { sock.sendMessage(jid, { text: '❌ Erro ao baixar música do SoundCloud.' }); }
-                    estaBaixando = false;
-                });
+            case 's':
+            case 'sticker':
+                try {
+                    const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const imgS = m.message.imageMessage || quotedS?.imageMessage;
+                    if (imgS) {
+                        const stream = await downloadContentFromMessage(imgS, 'image');
+                        let buffer = Buffer.from([]);
+                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                        
+                        const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Garibaldo356', type: StickerTypes.FULL });
+                        await sock.sendMessage(jid, await sticker.toMessage());
+                        
+                        try {
+                            await sock.sendMessage(jid, { delete: m.key });
+                        } catch (delErr) {
+                            console.log('Erro ao deletar imagem (Verifique se o bot é Admin):', delErr.message);
+                        }
+                    }
+                } catch (stkErr) {
+                    console.error('Erro no comando de sticker:', stkErr);
+                }
                 break;
 
+            // --- DEPOIS DAQUI TODOS EXIGEM ADMIN ---
             case 'tornaadm':
                 if (!isSenderAdmin) return;
                 const userToAdmin = getMention();
                 if (!userToAdmin) return sock.sendMessage(jid, { text: '❌ Mencione alguém!' });
                 await sock.groupParticipantsUpdate(jid, [userToAdmin], "promote");
                 await sock.sendMessage(jid, { text: `✅ @${userToAdmin.split('@')[0]} agora é Admin!`, mentions: [userToAdmin] });
-                break;
-
-            case 'mat':
-                if (body.toLowerCase().includes('@eu') && !mentions.includes(sender)) {
-                    mentions.push(sender);
-                }
-                if (mentions.length !== 2) return sock.sendMessage(jid, { text: '❌ Mencione 2 pessoas: !mat @eu @pessoa' });
-                
-                try {
-                    await sock.sendMessage(jid, { text: '❤️ *Montando o clima amoroso...*' });
-                    let p1, p2;
-                    try { p1 = await sock.profilePictureUrl(mentions[0], 'image'); } catch { p1 = 'https://i.imgur.com/83p1qS6.png'; }
-                    try { p2 = await sock.profilePictureUrl(mentions[1], 'image'); } catch { p2 = 'https://i.imgur.com/83p1qS6.png'; }
-                    const img1 = await Jimp.read(p1);
-                    const img2 = await Jimp.read(p2);
-                    const heart = await Jimp.read('https://i.imgur.com/Ewx3c4P.png');
-                    img1.resize(300, 300); img2.resize(300, 300); heart.resize(150, 150);
-                    const canvas = new Jimp(750, 350, 0x00000000);
-                    canvas.composite(img1, 50, 25); canvas.composite(img2, 400, 25); canvas.composite(heart, 300, 100);
-                    const outPath = `./match_${Date.now()}.png`;
-                    await canvas.writeAsync(outPath);
-                    const chance = Math.floor(Math.random() * 101);
-                    const msg = `╭─── [ ❤️ *ATURINO MATCH* ] ───╮\n│\n│ ✨ @${mentions[0].split('@')[0]} & @${mentions[1].split('@')[0]}\n│ ❤️ *Chance:* ${chance}%\n╰──────────────────────╯`;
-                    await sock.sendMessage(jid, { image: { url: outPath }, caption: msg, mentions: mentions });
-                    if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
-                } catch (e) { sock.sendMessage(jid, { text: '❌ Erro ao gerar Match.' }); }
                 break;
 
             case 'mute':
@@ -370,53 +284,6 @@ async function startAtrinoBot() {
                 if (advertencias[getMention()]) {
                     advertencias[getMention()]--;
                     await sock.sendMessage(jid, { text: `✅ Advertência removida.`, mentions: [getMention()] });
-                }
-                break;
-
-            case 's':
-            case 'sticker':
-                try {
-                    const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                    const imgS = m.message.imageMessage || quotedS?.imageMessage;
-                    if (imgS) {
-                        const stream = await downloadContentFromMessage(imgS, 'image');
-                        let buffer = Buffer.from([]);
-                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                        
-                        const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Garibaldo356', type: StickerTypes.FULL });
-                        await sock.sendMessage(jid, await sticker.toMessage());
-                        
-                        try {
-                            await sock.sendMessage(jid, { delete: m.key });
-                        } catch (delErr) {
-                            console.log('Erro ao deletar imagem (Verifique se o bot é Admin):', delErr.message);
-                        }
-                    }
-                } catch (stkErr) {
-                    console.error('Erro no comando de sticker:', stkErr);
-                }
-                break;
-
-            case 'a':
-                try {
-                    const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                    const vidA = m.message.videoMessage || quotedA?.videoMessage;
-                    if (vidA && vidA.seconds <= 10) {
-                        const stream = await downloadContentFromMessage(vidA, 'video');
-                        let buffer = Buffer.from([]);
-                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                        
-                        const sticker = new Sticker(buffer, { pack: 'Animado', author: 'Garibaldo356', type: StickerTypes.FULL, quality: 30 });
-                        await sock.sendMessage(jid, await sticker.toMessage());
-                        
-                        try {
-                            await sock.sendMessage(jid, { delete: m.key });
-                        } catch (delErr) {
-                            console.log('Erro ao deletar vídeo (Verifique se o bot é Admin):', delErr.message);
-                        }
-                    }
-                } catch (gifErr) {
-                    console.error('Erro no comando de sticker animado:', gifErr);
                 }
                 break;
 
@@ -477,55 +344,6 @@ async function startAtrinoBot() {
                     await sock.sendMessage(jid, { text: '❌ Erro ao fixar. Verifique se sou administrador do grupo.' });
                 }
                 break;
-
-            case 'editar':
-                const instrucao = `📝 *CONFIGURAÇÃO DE PERFIL*\n\nCopie a lista abaixo, preencha seus dados e envie a mensagem contendo o comando *!editapronto* no final.\n\nIdade: \nSexualidade: \nEstado Civil: \nHobbies: \n\n*!editapronto*`;
-                await sock.sendMessage(jid, { text: instrucao }, { quoted: m });
-                break;
-
-            case 'perfil':
-                const target = getMention() || sender;
-                const perfil = perfis[target];
-
-                if (!perfil) {
-                    return sock.sendMessage(jid, { text: target === sender ? '❌ Você ainda não tem um perfil. Use *!editar* para criar!' : '❌ Este usuário ainda não configurou um perfil.' });
-                }
-
-                let ppPerfil;
-                try {
-                    ppPerfil = await sock.profilePictureUrl(target, 'image');
-                } catch {
-                    ppPerfil = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png';
-                }
-
-                const textoPerfil = `╭─── [ 👤 *PERFIL DO USUÁRIO* ] ───╮\n│\n│ 👤 *Nome:* @${target.split('@')[0]}\n│ 🎂 *Idade:* ${perfil.idade}\n│ 🌈 *Sexualidade:* ${perfil.sexualidade}\n│ 💍 *Estado Civil:* ${perfil.estadoCivil}\n│ 🎨 *Hobbies:* ${perfil.hobbies}\n│\n╰──────────────────────────╯`;
-
-                await sock.sendMessage(jid, { 
-                    image: { url: ppPerfil }, 
-                    caption: textoPerfil, 
-                    mentions: [target] 
-                }, { quoted: m });
-                break;
-
-            case 'iniciar':
-                if (jogosAtivos[jid]) return sock.sendMessage(jid, { text: '⚠️ O jogo já está rolando!' });
-                await iniciarRodada(sock, jid);
-                break;
-
-            case 'stop':
-                if (!jogosAtivos[jid]) return sock.sendMessage(jid, { text: '❌ Não há jogo ativo agora.' });
-                clearInterval(jogosAtivos[jid].intervalo);
-                delete jogosAtivos[jid];
-                await sock.sendMessage(jid, { text: '🛑 *O jogo de filmes foi parado.*' });
-                break;
-
-            case 'pontos':
-                const pts = pontosFilmes[sender] || 0;
-                await sock.sendMessage(jid, { text: `🏆 @${sender.split('@')[0]}, você tem *${pts}* pontos!`, mentions: [sender] }, { quoted: m });
-                break;
-
-            case 'ping': await sock.sendMessage(jid, { text: '🏓 Pong!' }); break;
-            case 'id': await sock.sendMessage(jid, { text: `👤 ID: ${sender}` }); break;
         }
     });
 }
