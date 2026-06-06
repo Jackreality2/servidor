@@ -258,7 +258,7 @@ async function startAtrinoBot() {
                     if (!busca.startsWith('https://') && !busca.startsWith('http://')) {
                         const resultados = await client.search(busca, 'track').catch(() => []);
                         if (!resultados || resultados.length === 0) {
-                            return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome no SoundCloud.' }, { quoted: m });
+                            return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome.' }, { quoted: m });
                         }
                         urlDoSoundcloud = resultados[0].url;
                     }
@@ -269,29 +269,34 @@ async function startAtrinoBot() {
                         musicaInfo = await client.getSongInfo(urlDoSoundcloud);
                     } catch (infoErr) {
                         console.error('Erro ao obter info do SoundCloud:', infoErr);
-                        return await sock.sendMessage(jid, { text: '❌ Erro ao acessar as informações da música no SoundCloud.' }, { quoted: m });
+                        return await sock.sendMessage(jid, { text: '❌ Erro ao acessar as informações da música.' }, { quoted: m });
                     }
-                    
-                    // Baixa o áudio completo (método estável para o Render)
-                    const streamDeAudio = await client.download(urlDoSoundcloud);
                     
                     const arquivoTemporarioMp3 = path.join('/tmp', `sc_${Date.now()}.mp3`);
                     const arquivoTemporarioOgg = path.join('/tmp', `sc_${Date.now()}.ogg`);
 
-                    const writeStream = fs.createWriteStream(arquivoTemporarioMp3);
-                    streamDeAudio.pipe(writeStream);
+                    await sock.sendMessage(jid, { text: `🎧 Convertendo e enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
 
-                    await new Promise((resolve, reject) => {
-                        writeStream.on('finish', resolve);
-                        writeStream.on('error', reject);
-                    });
+                    // 🔥 NOVA CORREÇÃO: Método estável de download para evitar quebra de fluxo
+                    try {
+                        const streamDeAudio = await client.downloadProgressive(urlDoSoundcloud);
+                        const writeStream = fs.createWriteStream(arquivoTemporarioMp3);
+                        
+                        streamDeAudio.pipe(writeStream);
 
-                    // Validação para garantir que o arquivo não veio zerado por direitos autorais
-                    if (!fs.existsSync(arquivoTemporarioMp3) || fs.statSync(arquivoTemporarioMp3).size === 0) {
-                        throw new Error("Arquivo baixado está vazio.");
+                        await new Promise((resolve, reject) => {
+                            writeStream.on('finish', resolve);
+                            writeStream.on('error', reject);
+                        });
+                    } catch (downErr) {
+                        console.error('Erro no download do stream:', downErr);
+                        return await sock.sendMessage(jid, { text: '❌ Não consegui baixar essa música. Tente outra!' }, { quoted: m });
                     }
 
-                    await sock.sendMessage(jid, { text: `🎧 Convertendo e enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
+                    // Validação para garantir que o arquivo existe e tem tamanho
+                    if (!fs.existsSync(arquivoTemporarioMp3) || fs.statSync(arquivoTemporarioMp3).size === 0) {
+                        throw new Error("Arquivo baixado está vazio ou inexistente.");
+                    }
 
                     // Converte para o formato de áudio nativo do WhatsApp (Ogg/Opus) usando o ffmpeg-static
                     await new Promise((resolve, reject) => {
@@ -322,7 +327,7 @@ async function startAtrinoBot() {
 
                 } catch (playErr) {
                     console.error('Erro geral no comando play:', playErr);
-                    await sock.sendMessage(jid, { text: '❌ Não consegui processar esta música. Ela pode estar protegida ou indisponível. Tente outro nome!' }, { quoted: m });
+                    await sock.sendMessage(jid, { text: '❌ Não consegui processar esta música. Ela pode estar indisponível no momento.' }, { quoted: m });
                 }
                 break;
 
