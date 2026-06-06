@@ -223,10 +223,10 @@ async function startAtrinoBot() {
                 const menu = `╭─── [ ATRINO BOT ] ───╮
 │
 │ 🧑‍🤝‍🧑 *Membros:*
-│ ➥ !play [nome] - Tocar música
 │ ➥ !s - Figurinha (Foto)
 │
 │ 👮 *Admin:*
+│ ➥ !play [nome] - Tocar música
 │ ➥ !tornaadm @user - Dar Admin
 │ ➥ !totag - Marcar o grupo
 │ ➥ !adv @user - Dar advertência
@@ -247,6 +247,10 @@ async function startAtrinoBot() {
             case 'yt':
             case 'youtube':
                 try {
+                    if (!isSenderAdmin) {
+                        return await sock.sendMessage(jid, { text: '❌ Apenas administradores podem usar o comando de música!' }, { quoted: m });
+                    }
+
                     const busca = args.join(' ');
                     if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link! Exemplo: !play Nome da Musica' }, { quoted: m });
 
