@@ -250,55 +250,54 @@ async function startAtrinoBot() {
                     const busca = args.join(' ');
                     if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link! Exemplo: !play Nome da Musica' }, { quoted: m });
 
-                    await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}" no SoundCloud...` }, { quoted: m });
+                    await sock.sendMessage(jid, { text: `🎵 Buscando e processando "${busca}" via API Segura...` }, { quoted: m });
 
-                    let urlDoSoundcloud = busca;
-
-                    // Se não for um link direto do SoundCloud, faz a busca pelo nome da música
-                    if (!busca.startsWith('https://') && !busca.startsWith('http://')) {
-                        const resultados = await client.search(busca, 'track').catch(() => []);
-                        if (!resultados || resultados.length === 0) {
-                            return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome.' }, { quoted: m });
-                        }
-                        urlDoSoundcloud = resultados[0].url;
-                    }
-
-                    // Obtém as informações da música de forma segura
-                    let musicaInfo;
-                    try {
-                        musicaInfo = await client.getSongInfo(urlDoSoundcloud);
-                    } catch (infoErr) {
-                        console.error('Erro ao obter info do SoundCloud:', infoErr);
-                        return await sock.sendMessage(jid, { text: '❌ Erro ao acessar as informações da música.' }, { quoted: m });
-                    }
+                    // 🔥 Usando uma API pública de conversão/busca que ignora os bloqueios do Render
+                    // Esta API busca no YouTube internamente por servidores que não possuem o bloqueio
+                    const urlApiBusca = `https://api.vreden.web.id/api/ytplay?query=${encodeURIComponent(busca)}`;
                     
-                    const arquivoTemporarioMp3 = path.join('/tmp', `sc_${Date.now()}.mp3`);
-                    const arquivoTemporarioOgg = path.join('/tmp', `sc_${Date.now()}.ogg`);
+                    // Faz a requisição HTTP nativa para obter o link do MP3
+                    const respostaApi = await new Promise((resolve, reject) => {
+                        http.get(urlApiBusca, (res) => {
+                            let data = '';
+                            res.on('data', (chunk) => data += chunk);
+                            res.on('end', () => resolve(JSON.parse(data)));
+                        }).on('error', (err) => reject(err));
+                    }).catch(() => null);
 
-                    await sock.sendMessage(jid, { text: `🎧 Convertendo e enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
-
-                    // 🔥 NOVA CORREÇÃO: Método estável de download para evitar quebra de fluxo
-                    try {
-                        const streamDeAudio = await client.downloadProgressive(urlDoSoundcloud);
-                        const writeStream = fs.createWriteStream(arquivoTemporarioMp3);
-                        
-                        streamDeAudio.pipe(writeStream);
-
-                        await new Promise((resolve, reject) => {
-                            writeStream.on('finish', resolve);
-                            writeStream.on('error', reject);
-                        });
-                    } catch (downErr) {
-                        console.error('Erro no download do stream:', downErr);
-                        return await sock.sendMessage(jid, { text: '❌ Não consegui baixar essa música. Tente outra!' }, { quoted: m });
+                    if (!respostaApi || !respostaApi.status || !respostaApi.result) {
+                        return await sock.sendMessage(jid, { text: '❌ Sistema indisponível no momento. Tente novamente em instantes!' }, { quoted: m });
                     }
 
-                    // Validação para garantir que o arquivo existe e tem tamanho
+                    const dadosMusica = respostaApi.result;
+                    const urlDoMp3 = dadosMusica.download.url; // Link direto do arquivo MP3 gerado pela API
+                    const titulo = dadosMusica.title;
+                    const artista = dadosMusica.channel;
+
+                    const arquivoTemporarioMp3 = path.join('/tmp', `api_${Date.now()}.mp3`);
+                    const arquivoTemporarioOgg = path.join('/tmp', `api_${Date.now()}.ogg`);
+
+                    await sock.sendMessage(jid, { text: `🎧 Convertendo e enviando: *${titulo}*\n👤 Canal/Artista: ${artista}` });
+
+                    // Baixa o arquivo MP3 direto da API pública para o Render
+                    const fileStream = fs.createWriteStream(arquivoTemporarioMp3);
+                    await new Promise((resolve, reject) => {
+                        http.get(urlDoMp3, (res) => {
+                            res.pipe(fileStream);
+                            fileStream.on('finish', () => {
+                                fileStream.close();
+                                resolve();
+                            });
+                            fileStream.on('error', (err) => reject(err));
+                        }).on('error', (err) => reject(err));
+                    });
+
+                    // Validação do arquivo baixado
                     if (!fs.existsSync(arquivoTemporarioMp3) || fs.statSync(arquivoTemporarioMp3).size === 0) {
-                        throw new Error("Arquivo baixado está vazio ou inexistente.");
+                        throw new Error("Falha ao baixar o arquivo da API.");
                     }
 
-                    // Converte para o formato de áudio nativo do WhatsApp (Ogg/Opus) usando o ffmpeg-static
+                    // Converte para o formato de áudio nativo do WhatsApp (Ogg/Opus)
                     await new Promise((resolve, reject) => {
                         fluentFfmpeg(arquivoTemporarioMp3)
                             .toFormat('ogg')
@@ -306,7 +305,7 @@ async function startAtrinoBot() {
                             .output(arquivoTemporarioOgg)
                             .on('end', resolve)
                             .on('error', (err) => {
-                                console.error('Erro no FFmpeg do SoundCloud:', err);
+                                console.error('Erro no FFmpeg:', err);
                                 reject(err);
                             })
                             .run();
@@ -321,16 +320,15 @@ async function startAtrinoBot() {
                         ptt: true 
                     }, { quoted: m });
 
-                    // 🧹 Limpeza dos arquivos temporários no Render
+                    // 🧹 Limpeza dos arquivos temporários
                     if (fs.existsSync(arquivoTemporarioMp3)) fs.unlinkSync(arquivoTemporarioMp3);
                     if (fs.existsSync(arquivoTemporarioOgg)) fs.unlinkSync(arquivoTemporarioOgg);
 
                 } catch (playErr) {
-                    console.error('Erro geral no comando play:', playErr);
-                    await sock.sendMessage(jid, { text: '❌ Não consegui processar esta música. Ela pode estar indisponível no momento.' }, { quoted: m });
+                    console.error('Erro geral no comando play via API:', playErr);
+                    await sock.sendMessage(jid, { text: '❌ Não consegui processar esta música através da API. Tente mudar um pouco o nome!' }, { quoted: m });
                 }
-                break;
-
+                break;     
             case 's':
             case 'sticker':
                 try {
