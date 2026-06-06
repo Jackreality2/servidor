@@ -22,11 +22,18 @@ let estaBaixando = false;
 let botSilenciado = false;
 let perfis = fs.existsSync('./perfis.json') ? JSON.parse(fs.readFileSync('./perfis.json')) : {};
 let gruposAutorizados = {}; // Armazenamento em memória (reinicia se o bot for desligado)
+let latestQrLink = null; // Armazena o link do último QR code gerado
 
-// --- SISTEMA ANTI-HIBERNAÇÃO (KEEP-ALIVE) ---
+// --- SISTEMA ANTI-HIBERNAÇÃO E REDIRECIONAMENTO DE QR CODE ---
 http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Atrino Bot: Monitoramento Ativo.\n');
+    if (latestQrLink) {
+        // Se houver um QR Code ativo, redireciona a página da web direto para o link da API do QR Code
+        res.writeHead(302, { 'Location': latestQrLink });
+        res.end();
+    } else {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>Atrino Bot: Monitoramento Ativo.</h1><p>O bot já está conectado ou aguardando inicialização.</p>');
+    }
 }).listen(7860, '0.0.0.0', () => {
     console.log('🛰️ Monitor de Estabilidade rodando na porta 7860');
 });
@@ -92,11 +99,15 @@ async function startAtrinoBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
-            const qrLink = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(qr);
-            console.log('\n🔗 LINK DO QR CODE: ' + qrLink + '\n');
+            // Gera e salva o link público do QR Code para o redirecionamento web
+            latestQrLink = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(qr);
+            console.log('\n🔗 LINK DO QR CODE: ' + latestQrLink + '\n');
             qrcode.generate(qr, { small: false });
         }
-        if (connection === 'open') console.log('\n✅ ATRINO BOT ONLINE!\n');
+        if (connection === 'open') {
+            console.log('\n✅ ATRINO BOT ONLINE!\n');
+            latestQrLink = null; // Limpa o QR code já que conectou com sucesso
+        }
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) startAtrinoBot();
@@ -108,10 +119,8 @@ async function startAtrinoBot() {
         if (!m.message || m.key.fromMe) return;
 
         const jid = m.key.remoteJid;
-        // Normaliza o sender para remover o sufixo de dispositivo (:1, :2, etc) e suportar IDs @lid
         const sender = (m.key.participant || m.key.remoteJid).split(':')[0].replace(/@.+/, '') + '@s.whatsapp.net';
         
-        // Captura o corpo da mensagem de forma mais robusta (incluindo mensagens efêmeras e botões)
         const body = m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || m.message.buttonsResponseMessage?.selectedButtonId || m.message.templateButtonReplyMessage?.selectedId || m.message.listResponseMessage?.singleSelectReply?.selectedRowId || m.message.viewOnceMessageV2?.message?.imageMessage?.caption || m.message.viewOnceMessageV2?.message?.videoMessage?.caption || "";
         const fullText = body.trim();
         const isCmd = fullText.startsWith('!');
@@ -120,7 +129,6 @@ async function startAtrinoBot() {
         const isAuthorized = gruposAutorizados[jid] === true;
         const isSupremo = (sender === DONO_SUPREMO);
 
-        // Filtro de segurança: permite processar se não for grupo, se estiver autorizado ou se for o comando de registro (ignora case e espaços)
         if (isGroup && !isAuthorized && !fullText.toLowerCase().startsWith('!register')) return;
 
         if (mutados.includes(sender)) return await sock.sendMessage(jid, { delete: m.key });
@@ -140,7 +148,7 @@ async function startAtrinoBot() {
                     hobbies: hobbies || 'Não informado'
                 };
                 fs.writeFileSync('./perfis.json', JSON.stringify(perfis, null, 2));
-                return await sock.sendMessage(jid, { text: '✅ *Perfil atualizado com sucesso!* Digite !perfil para ver seu cartão.' });
+                return await sock.sendMessage(jid, { text: '✅ *Perfil updated com sucesso!* Digite !perfil para ver seu cartão.' });
             }
         }
 
@@ -184,7 +192,6 @@ async function startAtrinoBot() {
                 break;
 
             case 'menu':
-                // 🔒 Nova trava: Se não for admin ou dono, o bot ignora ou avisa
                 if (!isSenderAdmin) {
                     return await sock.sendMessage(jid, { text: '❌ Apenas administradores podem ver o menu!' }, { quoted: m });
                 }
@@ -240,12 +247,10 @@ async function startAtrinoBot() {
                 break;
 
             case 'mat':
-                // Lógica @eu: se o texto contiver @eu, adiciona o sender às menções
                 if (body.toLowerCase().includes('@eu') && !mentions.includes(sender)) {
                     mentions.push(sender);
                 }
-
-                if (mentions.length !== 2) return sock.sendMessage(jid, { text: '❌ Mencione 2 pessoas (ou use @eu e mencione outra): !mat @eu @pessoa' });
+                if (mentions.length !== 2) return sock.sendMessage(jid, { text: '❌ Mencione 2 pessoas: !mat @user1 @user2' });
                 
                 try {
                     await sock.sendMessage(jid, { text: '❤️ *Montando o clima amoroso...*' });
@@ -308,7 +313,7 @@ async function startAtrinoBot() {
                     const stream = await downloadContentFromMessage(imgS, 'image');
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                    const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Lino Dev', type: StickerTypes.FULL });
+                    const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Garibaldo356', type: StickerTypes.FULL });
                     await sock.sendMessage(jid, await sticker.toMessage());
                 }
                 break;
@@ -320,7 +325,7 @@ async function startAtrinoBot() {
                     const stream = await downloadContentFromMessage(vidA, 'video');
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                    const sticker = new Sticker(buffer, { pack: 'Animado', author: 'Lino Dev', type: StickerTypes.FULL, quality: 30 });
+                    const sticker = new Sticker(buffer, { pack: 'Animado', author: 'Garibaldo356', type: StickerTypes.FULL, quality: 30 });
                     await sock.sendMessage(jid, await sticker.toMessage());
                 }
                 break;
@@ -372,15 +377,7 @@ async function startAtrinoBot() {
                     ppPerfil = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png';
                 }
 
-                const textoPerfil = `╭─── [ 👤 *PERFIL DO USUÁRIO* ] ───╮
-│
-│ 👤 *Nome:* @${target.split('@')[0]}
-│ 🎂 *Idade:* ${perfil.idade}
-│ 🌈 *Sexualidade:* ${perfil.sexualidade}
-│ 💍 *Estado Civil:* ${perfil.estadoCivil}
-│ 🎨 *Hobbies:* ${perfil.hobbies}
-│
-╰──────────────────────────╯`;
+                const textoPerfil = `╭─── [ 👤 *PERFIL DO USUÁRIO* ] ───╮\n│\n│ 👤 *Nome:* @${target.split('@')[0]}\n│ 🎂 *Idade:* ${perfil.idade}\n│ 🌈 *Sexualidade:* ${perfil.sexualidade}\n│ 💍 *Estado Civil:* ${perfil.estadoCivil}\n│ 🎨 *Hobbies:* ${perfil.hobbies}\n│\n╰──────────────────────────╯`;
 
                 await sock.sendMessage(jid, { 
                     image: { url: ppPerfil }, 
