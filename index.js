@@ -15,6 +15,9 @@ const fluentFfmpeg = require('fluent-ffmpeg');
 // Define o caminho do binário estático do ffmpeg-static
 fluentFfmpeg.setFfmpegPath(ffmpegPath);
 
+// --- INTEGRAÇÃO DO YOUTUBE ---
+const ytdl = require('@distube/ytdl-core');
+
 // --- INTEGRAÇÃO DO SOUNDCLOUD ---
 const SoundCloud = require("soundcloud-scraper");
 const client = new SoundCloud.Client();
@@ -243,32 +246,40 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: menu }, { quoted: m });
                 break;
 
-            case 'play':
+            case 'yt':
+            case 'youtube':
                 try {
                     const busca = args.join(' ');
-                    if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link! Exemplo: !play Nome da Musica' }, { quoted: m });
+                    if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link do YouTube!' }, { quoted: m });
 
-                    await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}" no SoundCloud...` }, { quoted: m });
+                    await sock.sendMessage(jid, { text: `🔍 Buscando "${busca}" no YouTube...` }, { quoted: m });
 
-                    let urlDoSoundcloud = busca;
+                    let urlDoYoutube = busca;
 
-                    if (!busca.startsWith('https://')) {
-                        const resultados = await client.search(busca, 'track');
-                        if (resultados.length === 0) {
-                            return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome.' }, { quoted: m });
-                        }
-                        urlDoSoundcloud = resultados[0].url;
+                    // Se não for um link direto, ele tenta tratar como busca (o ytdl precisa do link correto)
+                    if (!busca.startsWith('https://') && !busca.startsWith('http://')) {
+                        // Uma alternativa simples é usar o link de busca do próprio YouTube se o robô aceitar, 
+                        // mas o ideal é passar o link direto do vídeo.
+                        return await sock.sendMessage(jid, { text: '❌ Por enquanto, envie o link direto do vídeo do YouTube! Exemplo: !yt https://www.youtube.com/watch?v=...' }, { quoted: m });
                     }
 
-                    const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
-                    
-                    // 🚀 ALTERAÇÃO AQUI: Mudamos para o método de download direto e mais estável
-                    const streamDeAudio = await client.download(urlDoSoundcloud);
-                    
-                    const arquivoTemporarioMp3 = path.join('/tmp', `temp_${Date.now()}.mp3`);
-                    const arquivoTemporarioOgg = path.join('/tmp', `temp_${Date.now()}.ogg`);
+                    // Obtém as informações do vídeo (Título, Autor, etc)
+                    const info = await ytdl.getInfo(urlDoYoutube);
+                    const titulo = info.videoDetails.title;
+                    const artista = info.videoDetails.author.name;
 
-                    const writeStream = fs.createWriteStream(arquivoTemporarioMp3);
+                    const arquivoTemporarioMp4 = path.join('/tmp', `yt_${Date.now()}.mp4`);
+                    const arquivoTemporarioOgg = path.join('/tmp', `yt_${Date.now()}.ogg`);
+
+                    await sock.sendMessage(jid, { text: `⏳ Baixando e convertendo: *${titulo}*\n👤 Canal: ${artista}` });
+
+                    // Baixa apenas o áudio em alta qualidade do YouTube
+                    const streamDeAudio = ytdl(urlDoYoutube, { 
+                        filter: 'audioonly', 
+                        quality: 'highestaudio' 
+                    });
+
+                    const writeStream = fs.createWriteStream(arquivoTemporarioMp4);
                     streamDeAudio.pipe(writeStream);
 
                     await new Promise((resolve, reject) => {
@@ -276,22 +287,15 @@ async function startAtrinoBot() {
                         writeStream.on('error', reject);
                     });
 
-                    // 🛡️ VALIDAÇÃO DE SEGURANÇA: Verifica se o SoundCloud não bloqueou o download
-                    if (!fs.existsSync(arquivoTemporarioMp3) || fs.statSync(arquivoTemporarioMp3).size === 0) {
-                        throw new Error("O download do SoundCloud veio vazio. Bloqueio de streaming.");
-                    }
-
-                    await sock.sendMessage(jid, { text: `🎧 Convertendo e enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
-
-                    // Executa a conversão usando o ffmpeg-static
+                    // Executa a conversão para o formato do WhatsApp usando o FFmpeg que já arrumamos
                     await new Promise((resolve, reject) => {
-                        fluentFfmpeg(arquivoTemporarioMp3)
+                        fluentFfmpeg(arquivoTemporarioMp4)
                             .toFormat('ogg')
                             .audioCodec('libopus')
                             .output(arquivoTemporarioOgg)
                             .on('end', resolve)
                             .on('error', (err) => {
-                                console.error('Erro detalhado do FFmpeg:', err);
+                                console.error('Erro no FFmpeg do YouTube:', err);
                                 reject(err);
                             })
                             .run();
@@ -299,19 +303,20 @@ async function startAtrinoBot() {
 
                     const audioBuffer = fs.readFileSync(arquivoTemporarioOgg);
 
+                    // Envia como nota de voz no grupo
                     await sock.sendMessage(jid, { 
                         audio: audioBuffer, 
                         mimetype: 'audio/ogg; codecs=opus', 
                         ptt: true 
                     }, { quoted: m });
 
-                    // 🧹 Limpeza
-                    if (fs.existsSync(arquivoTemporarioMp3)) fs.unlinkSync(arquivoTemporarioMp3);
+                    // 🧹 Limpeza dos arquivos criados no Render
+                    if (fs.existsSync(arquivoTemporarioMp4)) fs.unlinkSync(arquivoTemporarioMp4);
                     if (fs.existsSync(arquivoTemporarioOgg)) fs.unlinkSync(arquivoTemporarioOgg);
 
-                } catch (playErr) {
-                    console.error('Erro geral no comando play:', playErr);
-                    await sock.sendMessage(jid, { text: '❌Não consegui baixar essa música. Ela pode estar protegida por direitos autorais no SoundCloud ou indisponível na região do servidor. Tente outra faixa!' }, { quoted: m });
+                } catch (ytErr) {
+                    console.error('Erro geral no comando YouTube:', ytErr);
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o áudio do YouTube. Certifique-se de que o link está correto ou tente outro vídeo.' }, { quoted: m });
                 }
                 break;
 
