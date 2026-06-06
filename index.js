@@ -29,6 +29,7 @@ const ID_DO_GRUPO = '120363425471646460@g.us';
 let mutados = [];
 let advertencias = {}; 
 let botSilenciado = false;
+let cooldowns = {};
 let qrAtual = null; // 🚀 Armazena o QR Code ativo para renderizar na Web do Render
 
 // --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
@@ -207,6 +208,16 @@ async function startAtrinoBot() {
 
         const args = body.slice(1).trim().split(/ +/);
         const command = args.shift().toLowerCase();
+
+        // --- SISTEMA DE COOLDOWN (10 SEGUNDOS) ---
+        const agora = Date.now();
+        const tempoEspera = 10000; // 10 segundos em milissegundos
+        if (cooldowns[sender] && agora < cooldowns[sender] + tempoEspera) {
+            const restante = ((cooldowns[sender] + tempoEspera - agora) / 1000).toFixed(1);
+            return await sock.sendMessage(jid, { text: `⏳ *Calma lá!* Aguarde ${restante}s para usar outro comando.` }, { quoted: m });
+        }
+        cooldowns[sender] = agora;
+
         let mentions = m.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const getMention = () => mentions[0] || m.message.extendedTextMessage?.contextInfo?.participant;
 
