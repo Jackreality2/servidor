@@ -262,8 +262,9 @@ async function startAtrinoBot() {
 
                     const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
                     
-                    // 🚀 Salvando na pasta /tmp do Linux para evitar erros de permissão de escrita
-                    const streamDeAudio = await musicaInfo.downloadProgressive();
+                    // 🚀 ALTERAÇÃO AQUI: Mudamos para o método de download direto e mais estável
+                    const streamDeAudio = await client.download(urlDoSoundcloud);
+                    
                     const arquivoTemporarioMp3 = path.join('/tmp', `temp_${Date.now()}.mp3`);
                     const arquivoTemporarioOgg = path.join('/tmp', `temp_${Date.now()}.ogg`);
 
@@ -275,9 +276,14 @@ async function startAtrinoBot() {
                         writeStream.on('error', reject);
                     });
 
+                    // 🛡️ VALIDAÇÃO DE SEGURANÇA: Verifica se o SoundCloud não bloqueou o download
+                    if (!fs.existsSync(arquivoTemporarioMp3) || fs.statSync(arquivoTemporarioMp3).size === 0) {
+                        throw new Error("O download do SoundCloud veio vazio. Bloqueio de streaming.");
+                    }
+
                     await sock.sendMessage(jid, { text: `🎧 Convertendo e enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
 
-                    // 🛠️ Executa a conversão com o ffmpeg-static
+                    // Executa a conversão usando o ffmpeg-static
                     await new Promise((resolve, reject) => {
                         fluentFfmpeg(arquivoTemporarioMp3)
                             .toFormat('ogg')
@@ -305,7 +311,7 @@ async function startAtrinoBot() {
 
                 } catch (playErr) {
                     console.error('Erro geral no comando play:', playErr);
-                    await sock.sendMessage(jid, { text: '❌ Erro ao processar ou converter o áudio da música.' }, { quoted: m });
+                    await sock.sendMessage(jid, { text: '❌ Erro ao baixar ou converter o áudio. Tente novamente ou use outro nome.' }, { quoted: m });
                 }
                 break;
 
