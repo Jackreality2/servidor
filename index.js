@@ -261,29 +261,52 @@ async function startAtrinoBot() {
                     }
 
                     const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
-                    const streamDeAudio = await musicaInfo.downloadProgressive();
                     
-                    const chunks = [];
-                    for await (const chunk of streamDeAudio) {
-                        chunks.push(chunk);
-                    }
-                    const audioBuffer = Buffer.concat(chunks);
+                    // 🚀 O pulo do gato: obter o stream direto e criar um caminho temporário
+                    const streamDeAudio = await musicaInfo.downloadProgressive();
+                    const arquivoTemporarioMp3 = path.join(__dirname, `temp_${Date.now()}.mp3`);
+                    const arquivoTemporarioOgg = path.join(__dirname, `temp_${Date.now()}.ogg`);
 
-                    if (audioBuffer.length === 0) {
-                        throw new Error("O áudio baixado está vazio.");
-                    }
+                    // Salva a stream bruta do SoundCloud em um arquivo MP3 temporário
+                    const writeStream = fs.createWriteStream(arquivoTemporarioMp3);
+                    streamDeAudio.pipe(writeStream);
 
-                    await sock.sendMessage(jid, { text: `🎧 Enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
+                    // Espera o download terminar completamente no servidor do Render
+                    await new Promise((resolve, reject) => {
+                        writeStream.on('finish', resolve);
+                        writeStream.on('error', reject);
+                    });
 
+                    await sock.sendMessage(jid, { text: `🎧 Convertendo e enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
+
+                    // 🛠️ Força o Fluent-FFmpeg a converter o MP3 para o formato OGG OPUS do WhatsApp
+                    await new Promise((resolve, reject) => {
+                        fluentFfmpeg(arquivoTemporarioMp3)
+                            .toFormat('ogg')
+                            .audioCodec('libopus')
+                            .output(arquivoTemporarioOgg)
+                            .on('end', resolve)
+                            .on('error', reject)
+                            .run();
+                    });
+
+                    // Lê o arquivo final convertido em Buffer
+                    const audioBuffer = fs.readFileSync(arquivoTemporarioOgg);
+
+                    // Envia como gravado/gravando perfeitamente para o grupo
                     await sock.sendMessage(jid, { 
                         audio: audioBuffer, 
-                        mimetype: 'audio/mpeg', 
+                        mimetype: 'audio/ogg; codecs=opus', 
                         ptt: true 
                     }, { quoted: m });
 
+                    // 🧹 Limpeza de arquivos temporários para não lotar o servidor do Render
+                    if (fs.existsSync(arquivoTemporarioMp3)) fs.unlinkSync(arquivoTemporarioMp3);
+                    if (fs.existsSync(arquivoTemporarioOgg)) fs.unlinkSync(arquivoTemporarioOgg);
+
                 } catch (playErr) {
                     console.error('Erro geral no comando play:', playErr);
-                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o comando !play.' }, { quoted: m });
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar ou converter o áudio da música.' }, { quoted: m });
                 }
                 break;
 
