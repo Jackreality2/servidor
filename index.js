@@ -8,11 +8,11 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 
-// 🚀 CORREÇÃO DO FFMPEG PARA O RENDER
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+// --- CORREÇÃO DEFINITIVA DO FFMPEG PARA O RENDER ---
+const ffmpegPath = require('ffmpeg-static');
 const fluentFfmpeg = require('fluent-ffmpeg');
 
-// Configura o caminho correto do executável para o bot usar no Linux do Render
+// Define o caminho do binário estático do ffmpeg-static
 fluentFfmpeg.setFfmpegPath(ffmpegPath);
 
 // --- INTEGRAÇÃO DO SOUNDCLOUD ---
