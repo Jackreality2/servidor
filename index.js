@@ -257,45 +257,24 @@ async function startAtrinoBot() {
                     const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
                     const streamDeAudio = await musicaInfo.downloadProgressive();
                     
-                    const nomeDoArquivo = path.join(__dirname, `${Date.now()}.mp3`);
-                    const writeStream = fs.createWriteStream(nomeDoArquivo);
-                    
-                    streamDeAudio.pipe(writeStream);
+                    // Coleta os dados da stream diretamente em um Buffer para evitar arquivos vazios
+                    const chunks = [];
+                    for await (const chunk of streamDeAudio) {
+                        chunks.push(chunk);
+                    }
+                    const audioBuffer = Buffer.concat(chunks);
 
-                    writeStream.on('finish', async () => {
-                        try {
-                            const stats = fs.statSync(nomeDoArquivo);
-                            if (stats.size === 0) {
-                                throw new Error("Arquivo baixado está vazio.");
-                            }
+                    if (audioBuffer.length === 0) {
+                        throw new Error("O áudio baixado está vazio.");
+                    }
 
-                            await sock.sendMessage(jid, { text: `🎧 Enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
+                    await sock.sendMessage(jid, { text: `🎧 Enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
 
-                            const audioBuffer = fs.readFileSync(nomeDoArquivo);
-
-                            await sock.sendMessage(jid, { 
-                                audio: audioBuffer, 
-                                mimetype: 'audio/mpeg', 
-                                ptt: true 
-                            }, { quoted: m });
-
-                        } catch (sendErr) {
-                            console.error('Erro ao enviar o arquivo de áudio:', sendErr);
-                            await sock.sendMessage(jid, { text: '❌ Não foi possível processar ou enviar este áudio.' }, { quoted: m });
-                        } finally {
-                            if (fs.existsSync(nomeDoArquivo)) {
-                                fs.unlinkSync(nomeDoArquivo);
-                            }
-                        }
-                    });
-
-                    writeStream.on('error', async (err) => {
-                        console.error('Erro durante a gravação do áudio:', err);
-                        await sock.sendMessage(jid, { text: '❌ Ocorreu um erro ao salvar o áudio no servidor.' }, { quoted: m });
-                        if (fs.existsSync(nomeDoArquivo)) {
-                            fs.unlinkSync(nomeDoArquivo);
-                        }
-                    });
+                    await sock.sendMessage(jid, { 
+                        audio: audioBuffer, 
+                        mimetype: 'audio/mpeg', 
+                        ptt: true 
+                    }, { quoted: m });
 
                 } catch (playErr) {
                     console.error('Erro geral no comando play:', playErr);
