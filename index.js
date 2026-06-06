@@ -7,12 +7,14 @@ const cron = require('node-cron');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
-const ffmpeg = require('@fluent-ffmpeg/ffmpeg'); // Caso use diretamente, mas o padrão do installer é o de baixo:
+
+// 🚀 CORREÇÃO DO FFMPEG PARA O RENDER
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const fluentFfmpeg = require('fluent-ffmpeg');
 
-// 🚀 ISSO AQUI DIZ AO BOT EXATAMENTE ONDE ESTÁ O FFMPEG NO RENDER!
+// Configura o caminho correto do executável para o bot usar no Linux do Render
 fluentFfmpeg.setFfmpegPath(ffmpegPath);
+
 // --- INTEGRAÇÃO DO SOUNDCLOUD ---
 const SoundCloud = require("soundcloud-scraper");
 const client = new SoundCloud.Client();
@@ -214,7 +216,6 @@ async function startAtrinoBot() {
 
         switch (command) {
             case 'menu':
-                // 🔒 Nova trava: Se não for admin ou dono, o bot ignora ou avisa
                 if (!isSenderAdmin) {
                     return await sock.sendMessage(jid, { text: '❌ Apenas administradores podem ver o menu!' }, { quoted: m });
                 }
@@ -262,7 +263,6 @@ async function startAtrinoBot() {
                     const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
                     const streamDeAudio = await musicaInfo.downloadProgressive();
                     
-                    // Coleta os dados da stream diretamente em um Buffer para evitar arquivos vazios
                     const chunks = [];
                     for await (const chunk of streamDeAudio) {
                         chunks.push(chunk);
