@@ -7,7 +7,12 @@ const cron = require('node-cron');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const ffmpeg = require('@fluent-ffmpeg/ffmpeg'); // Caso use diretamente, mas o padrão do installer é o de baixo:
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+const fluentFfmpeg = require('fluent-ffmpeg');
 
+// 🚀 ISSO AQUI DIZ AO BOT EXATAMENTE ONDE ESTÁ O FFMPEG NO RENDER!
+fluentFfmpeg.setFfmpegPath(ffmpegPath);
 // --- INTEGRAÇÃO DO SOUNDCLOUD ---
 const SoundCloud = require("soundcloud-scraper");
 const client = new SoundCloud.Client();
