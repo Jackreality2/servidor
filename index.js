@@ -262,16 +262,14 @@ async function startAtrinoBot() {
 
                     const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
                     
-                    // 🚀 O pulo do gato: obter o stream direto e criar um caminho temporário
+                    // 🚀 Salvando na pasta /tmp do Linux para evitar erros de permissão de escrita
                     const streamDeAudio = await musicaInfo.downloadProgressive();
-                    const arquivoTemporarioMp3 = path.join(__dirname, `temp_${Date.now()}.mp3`);
-                    const arquivoTemporarioOgg = path.join(__dirname, `temp_${Date.now()}.ogg`);
+                    const arquivoTemporarioMp3 = path.join('/tmp', `temp_${Date.now()}.mp3`);
+                    const arquivoTemporarioOgg = path.join('/tmp', `temp_${Date.now()}.ogg`);
 
-                    // Salva a stream bruta do SoundCloud em um arquivo MP3 temporário
                     const writeStream = fs.createWriteStream(arquivoTemporarioMp3);
                     streamDeAudio.pipe(writeStream);
 
-                    // Espera o download terminar completamente no servidor do Render
                     await new Promise((resolve, reject) => {
                         writeStream.on('finish', resolve);
                         writeStream.on('error', reject);
@@ -279,28 +277,29 @@ async function startAtrinoBot() {
 
                     await sock.sendMessage(jid, { text: `🎧 Convertendo e enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
 
-                    // 🛠️ Força o Fluent-FFmpeg a converter o MP3 para o formato OGG OPUS do WhatsApp
+                    // 🛠️ Executa a conversão com o ffmpeg-static
                     await new Promise((resolve, reject) => {
                         fluentFfmpeg(arquivoTemporarioMp3)
                             .toFormat('ogg')
                             .audioCodec('libopus')
                             .output(arquivoTemporarioOgg)
                             .on('end', resolve)
-                            .on('error', reject)
+                            .on('error', (err) => {
+                                console.error('Erro detalhado do FFmpeg:', err);
+                                reject(err);
+                            })
                             .run();
                     });
 
-                    // Lê o arquivo final convertido em Buffer
                     const audioBuffer = fs.readFileSync(arquivoTemporarioOgg);
 
-                    // Envia como gravado/gravando perfeitamente para o grupo
                     await sock.sendMessage(jid, { 
                         audio: audioBuffer, 
                         mimetype: 'audio/ogg; codecs=opus', 
                         ptt: true 
                     }, { quoted: m });
 
-                    // 🧹 Limpeza de arquivos temporários para não lotar o servidor do Render
+                    // 🧹 Limpeza
                     if (fs.existsSync(arquivoTemporarioMp3)) fs.unlinkSync(arquivoTemporarioMp3);
                     if (fs.existsSync(arquivoTemporarioOgg)) fs.unlinkSync(arquivoTemporarioOgg);
 
