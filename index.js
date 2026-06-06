@@ -246,6 +246,7 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: menu }, { quoted: m });
                 break;
 
+            case 'play':
             case 'yt':
             case 'youtube':
                 try {
@@ -256,24 +257,38 @@ async function startAtrinoBot() {
 
                     let urlDoYoutube = busca;
 
-                    // Se não for um link direto, ele tenta tratar como busca (o ytdl precisa do link correto)
+                    // Se não for um link direto do YouTube, trata o termo de busca convertendo dinamicamente
                     if (!busca.startsWith('https://') && !busca.startsWith('http://')) {
-                        // Uma alternativa simples é usar o link de busca do próprio YouTube se o robô aceitar, 
-                        // mas o ideal é passar o link direto do vídeo.
-                        return await sock.sendMessage(jid, { text: '❌ Por enquanto, envie o link direto do vídeo do YouTube! Exemplo: !yt https://www.youtube.com/watch?v=...' }, { quoted: m });
+                        urlDoYoutube = `https://www.youtube.com/watch?v=${encodeURIComponent(busca)}`;
+                        
+                        try {
+                            const buscaResult = await ytdl.getBasicInfo(`ytsearch:${busca}`).catch(() => null);
+                            if (buscaResult && buscaResult.videoDetails) {
+                                urlDoYoutube = buscaResult.videoDetails.video_url;
+                            }
+                        } catch (e) {
+                            console.log("Erro ao converter texto na busca direta do ytdl-core.");
+                        }
                     }
 
-                    // Obtém as informações do vídeo (Título, Autor, etc)
-                    const info = await ytdl.getInfo(urlDoYoutube);
+                    // Obtém as informações do vídeo com segurança contra travamentos
+                    let info;
+                    try {
+                        info = await ytdl.getInfo(urlDoYoutube);
+                    } catch (infoErr) {
+                        console.error('Erro ao obter info do vídeo:', infoErr);
+                        return await sock.sendMessage(jid, { text: '❌ Não consegui encontrar ou acessar essa música no YouTube. Tente digitar o nome completo ou enviar o link direto!' }, { quoted: m });
+                    }
+
                     const titulo = info.videoDetails.title;
                     const artista = info.videoDetails.author.name;
 
                     const arquivoTemporarioMp4 = path.join('/tmp', `yt_${Date.now()}.mp4`);
                     const arquivoTemporarioOgg = path.join('/tmp', `yt_${Date.now()}.ogg`);
 
-                    await sock.sendMessage(jid, { text: `⏳ Baixando e convertendo: *${titulo}*\n👤 Canal: ${artista}` });
+                    await sock.sendMessage(jid, { text: `⏳ Baixando e convertendo: *${titulo}*\n👤 Canal/Artista: ${artista}` });
 
-                    // Baixa apenas o áudio em alta qualidade do YouTube
+                    // Baixa o stream de áudio do YouTube
                     const streamDeAudio = ytdl(urlDoYoutube, { 
                         filter: 'audioonly', 
                         quality: 'highestaudio' 
@@ -287,7 +302,7 @@ async function startAtrinoBot() {
                         writeStream.on('error', reject);
                     });
 
-                    // Executa a conversão para o formato do WhatsApp usando o FFmpeg que já arrumamos
+                    // Converte para o formato de áudio nativo do WhatsApp (Ogg/Opus) usando o ffmpeg-static
                     await new Promise((resolve, reject) => {
                         fluentFfmpeg(arquivoTemporarioMp4)
                             .toFormat('ogg')
@@ -303,20 +318,20 @@ async function startAtrinoBot() {
 
                     const audioBuffer = fs.readFileSync(arquivoTemporarioOgg);
 
-                    // Envia como nota de voz no grupo
+                    // Envia como nota de voz (PTT)
                     await sock.sendMessage(jid, { 
                         audio: audioBuffer, 
                         mimetype: 'audio/ogg; codecs=opus', 
                         ptt: true 
                     }, { quoted: m });
 
-                    // 🧹 Limpeza dos arquivos criados no Render
+                    // 🧹 Limpeza obrigatória para o Render não encher o armazenamento temporário
                     if (fs.existsSync(arquivoTemporarioMp4)) fs.unlinkSync(arquivoTemporarioMp4);
                     if (fs.existsSync(arquivoTemporarioOgg)) fs.unlinkSync(arquivoTemporarioOgg);
 
                 } catch (ytErr) {
                     console.error('Erro geral no comando YouTube:', ytErr);
-                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o áudio do YouTube. Certifique-se de que o link está correto ou tente outro vídeo.' }, { quoted: m });
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o áudio do YouTube. Modifique o nome da busca ou tente novamente.' }, { quoted: m });
                 }
                 break;
 
