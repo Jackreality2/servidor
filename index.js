@@ -311,7 +311,7 @@ async function startAtrinoBot() {
 
                 } catch (playErr) {
                     console.error('Erro geral no comando play:', playErr);
-                    await sock.sendMessage(jid, { text: '❌ Erro ao baixar ou converter o áudio. Tente novamente ou use outro nome.' }, { quoted: m });
+                    await sock.sendMessage(jid, { text: '❌Não consegui baixar essa música. Ela pode estar protegida por direitos autorais no SoundCloud ou indisponível na região do servidor. Tente outra faixa!' }, { quoted: m });
                 }
                 break;
 
