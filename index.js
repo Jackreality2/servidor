@@ -1,63 +1,112 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, jidNormalizedUser, downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const P = require('pino');
 const qrcode = require('qrcode-terminal');
 const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 const cron = require('node-cron'); 
 const fs = require('fs');
-const { exec } = require('child_process');
 const http = require('http');
-const axios = require('axios'); 
-const Jimp = require('jimp'); 
+const path = require('path');
+
+// --- INTEGRAÇÃO DO SOUNDCLOUD ---
+const SoundCloud = require("soundcloud-scraper");
+const client = new SoundCloud.Client();
 
 const logger = P({ level: 'silent' });
 
 // --- CONFIGURAÇÕES MASTER ---
 const DONO_SUPREMO = '5521983161582@s.whatsapp.net'; 
 const DONO_ADMIN = '5521935052708@s.whatsapp.net'; 
-
+const ID_DO_GRUPO = '120363425471646460@g.us';
+ 
 let mutados = [];
 let advertencias = {}; 
-let estaBaixando = false; 
 let botSilenciado = false;
-let perfis = fs.existsSync('./perfis.json') ? JSON.parse(fs.readFileSync('./perfis.json')) : {};
-let gruposAutorizados = {}; // Armazenamento em memória (reinicia se o bot for desligado)
-let latestQrLink = null; // Armazena o link do último QR code gerado
+let qrAtual = null; // 🚀 Armazena o QR Code ativo para renderizar na Web do Render
 
-// --- SISTEMA ANTI-HIBERNAÇÃO E REDIRECIONAMENTO DE QR CODE ---
+// --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
+const PORT = parseInt(process.env.PORT, 10) || 7860;
+
+// --- SERVIDOR WEB DE MONITORAMENTO E QR CODE ---
 http.createServer((req, res) => {
-    if (latestQrLink) {
-        // Se houver um QR Code ativo, redireciona a página da web direto para o link da API do QR Code
-        res.writeHead(302, { 'Location': latestQrLink });
-        res.end();
-    } else {
+    // Caso o bot já esteja conectado e ativo
+    if (!qrAtual) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end('<h1>Atrino Bot: Monitoramento Ativo.</h1><p>O bot já está conectado ou aguardando inicialização.</p>');
+        res.end(`
+            <html>
+                <head>
+                    <title>Atrino Bot - Status</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; margin-top: 80px; background-color: #0f0c1b; color: #00ffcc; }
+                        .card { background: #17142b; display: inline-block; padding: 30px; border-radius: 15px; border: 1px solid #3d3475; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h1>🚀 Atrino Bot: Conectado e Ativo!</h1>
+                        <p style="color: #b3b0cb;">O monitoramento e o keep-alive no Render estão rodando perfeitamente.</p>
+                    </div>
+                </body>
+            </html>
+        `);
+        return;
     }
-}).listen(7860, '0.0.0.0', () => {
-    console.log('🛰️ Monitor de Estabilidade rodando na porta 7860');
+
+    // Caso o bot precise de escaneamento (Gera página com auto-refresh de 5 segundos)
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`
+        <html>
+            <head>
+                <title>Atrino Bot - Conexão</title>
+                <meta http-equiv="refresh" content="5">
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #111; color: #fff; }
+                    .qr-container { margin-top: 30px; }
+                </style>
+            </head>
+            <body>
+                <h1 style="color: #25D366;">Escaneie o QR Code do Atrino Bot</h1>
+                <p>Esta página atualiza sozinha a cada 5 segundos para manter o código sincronizado!</p>
+                <div class="qr-container">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrAtual)}" style="border: 10px solid white; border-radius: 10px; box-shadow: 0px 0px 20px rgba(255,255,255,0.2);" />
+                </div>
+                <p style="margin-top: 20px; color: #aaa; font-size: 14px;">Abra o WhatsApp > Aparelhos Conectados > Conectar um aparelho</p>
+            </body>
+        </html>
+    `);
+}).listen(PORT, '0.0.0.0', () => {
+    console.log(`🛰️ Servidor Keep-Alive e Web-QR ativo na porta ${PORT}`);
+    // Auto-ping interno para evitar que o Render derrube o processo por inatividade
+    setInterval(() => {
+        http.get(`http://localhost:${PORT}`).on('error', () => {});
+    }, 60000); // 1 minuto
 });
 
 async function startAtrinoBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
-    const { version } = await fetchLatestBaileysVersion();
+    
+    if (state.creds && state.creds.signedRegistrationInfo) {
+        console.log('📦 Carregando sessão existente da pasta "auth_info"...');
+    }
 
+    // --- CONFIGURAÇÃO CONTRA BLOQUEIOS ---
     const sock = makeWASocket({
-        version,
         logger,
         auth: state,
         printQRInTerminal: false,
-        browser: ['AtrinoBot', 'Linux', '3.0.0'],
-        connectTimeoutMs: 60000,
+        browser: ['Mac OS', 'Chrome', '121.0.0.0'], 
+        connectTimeoutMs: 120000, 
         keepAliveIntervalMs: 30000,
-        receivedPendingNotifications: true, 
+        markOnline: true,
+        shouldSyncHistoryMessage: () => false,
+        receivedPendingNotifications: false, 
     });
 
     sock.ev.on('creds.update', saveCreds);
 
     // --- SISTEMA DE BOAS-VINDAS ---
     sock.ev.on('group-participants.update', async (anu) => {
-        if (anu.action === 'add' && gruposAutorizados[anu.id] === true) {
+        if (anu.action === 'add' && anu.id === ID_DO_GRUPO) {
             for (const participant of anu.participants) {
                 let ppUrl;
                 try {
@@ -73,44 +122,45 @@ async function startAtrinoBot() {
 
     // --- AGENDAMENTOS AUTOMÁTICOS ---
     cron.schedule('0 0 * * *', async () => {
-        for (const jid in gruposAutorizados) {
-            if (gruposAutorizados[jid]) {
-                try {
-                    await sock.groupSettingUpdate(jid, 'announcement');
-                    const textoFechado = `╭─── [ 🔒 *SALÃO ENCERRADO* ] ───╮\n│\n│ 🌑 *O silêncio retorna ao salão.*\n│ ➥ As vozes agora repousam sob o lunar.\n│ ➥ Horário de descanso: 00:00h\n│\n╰─────────────────────╯`;
-                    await sock.sendMessage(jid, { text: textoFechado });
-                } catch (err) {}
-            }
-        }
+        try {
+            await sock.groupSettingUpdate(ID_DO_GRUPO, 'announcement');
+            const textoFechado = `╭─── [ 🔒 *SALÃO ENCERRADO* ] ───╮\n│\n│ 🌑 *O silêncio retorna ao salão.*\n│ ➥ As vozes agora repousam sob o lunar.\n│ ➥ Horário de descanso: 00:00h\n│\n╰─────────────────────╯`;
+            await sock.sendMessage(ID_DO_GRUPO, { text: textoFechado });
+        } catch (err) {}
     }, { timezone: "America/Sao_Paulo" });
 
     cron.schedule('0 4 * * *', async () => {
-        for (const jid in gruposAutorizados) {
-            if (gruposAutorizados[jid]) {
-                try {
-                    await sock.groupSettingUpdate(jid, 'not_announcement');
-                    const textoAberto = `╭─── [ 🔓 *SALÃO ABERTO* ] ───╮\n│\n│ 🌅 *As portas do salão se abrem.*\n│ ➥ O diálogo renasce sob o tempo marcado.\n│ ➥ Horário de despertar: 04:00h\n│\n╰─────────────────────╯`;
-                    await sock.sendMessage(jid, { text: textoAberto });
-                } catch (err) {}
-            }
-        }
+        try {
+            await sock.groupSettingUpdate(ID_DO_GRUPO, 'not_announcement');
+            const textoAberto = `╭─── [ 🔓 *SALÃO ABERTO* ] ───╮\n│\n│ 🌅 *As portas do salão se abrem.*\n│ ➥ O diálogo renasce sob o tempo marcado.\n│ ➥ Horário de despertar: 04:00h\n│\n╰─────────────────────╯`;
+            await sock.sendMessage(ID_DO_GRUPO, { text: textoAberto });
+        } catch (err) {}
     }, { timezone: "America/Sao_Paulo" });
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
-            // Gera e salva o link público do QR Code para o redirecionamento web
-            latestQrLink = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(qr);
-            console.log('\n🔗 LINK DO QR CODE: ' + latestQrLink + '\n');
+            qrAtual = qr; 
+            const qrLink = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(qr);
+            console.log('\n🔗 LINK DO QR CODE NO RENDER: ' + qrLink + '\n');
             qrcode.generate(qr, { small: false });
         }
         if (connection === 'open') {
-            console.log('\n✅ ATRINO BOT ONLINE!\n');
-            latestQrLink = null; // Limpa o QR code já que conectou com sucesso
+            qrAtual = null; 
+            console.log('\n✅ ATRINO BOT ONLINE NO RENDER!\n');
         }
         if (connection === 'close') {
-            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) startAtrinoBot();
+            qrAtual = null;
+            const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+            console.log(`🔌 Conexão encerrada. Razão: ${reason}`);
+            const shouldReconnect = reason !== DisconnectReason.loggedOut;
+            
+            if (shouldReconnect) { 
+                console.log('🔄 Tentando reconectar automaticamente...'); 
+                startAtrinoBot(); 
+            } else {
+                console.log('❌ Sessão encerrada permanentemente. É necessário ler o QR Code de novo.');
+            }
         }
     });
 
@@ -119,40 +169,20 @@ async function startAtrinoBot() {
         if (!m.message || m.key.fromMe) return;
 
         const jid = m.key.remoteJid;
-        const sender = (m.key.participant || m.key.remoteJid).split(':')[0].replace(/@.+/, '') + '@s.whatsapp.net';
+        if (!jid.endsWith('@g.us')) return; 
+        const sender = m.key.participant || m.key.remoteJid;
         
-        const body = m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || m.message.buttonsResponseMessage?.selectedButtonId || m.message.templateButtonReplyMessage?.selectedId || m.message.listResponseMessage?.singleSelectReply?.selectedRowId || m.message.viewOnceMessageV2?.message?.imageMessage?.caption || m.message.viewOnceMessageV2?.message?.videoMessage?.caption || "";
-        const fullText = body.trim();
-        const isCmd = fullText.startsWith('!');
-
-        const isGroup = jid.endsWith('@g.us');
-        const isAuthorized = gruposAutorizados[jid] === true;
-        const isSupremo = (sender === DONO_SUPREMO);
-
-        if (isGroup && !isAuthorized && !fullText.toLowerCase().startsWith('!register')) return;
-
-        if (mutados.includes(sender)) return await sock.sendMessage(jid, { delete: m.key });
-        
-        // --- SISTEMA DE EDIÇÃO DE PERFIL ---
-        if (body.toLowerCase().includes('!editapronto')) {
-            const idade = body.match(/Idade:\s*([^\n\r]*)/i)?.[1]?.trim();
-            const sexualidade = body.match(/Sexualidade:\s*([^\n\r]*)/i)?.[1]?.trim();
-            const estadoCivil = body.match(/Estado\s*Civil:\s*([^\n\r]*)/i)?.[1]?.trim();
-            const hobbies = body.match(/Hobbies:\s*([^\n\r]*)/i)?.[1]?.trim();
-
-            if (idade || sexualidade || estadoCivil || hobbies) {
-                perfis[sender] = {
-                    idade: idade || 'Não informado',
-                    sexualidade: sexualidade || 'Não informado',
-                    estadoCivil: estadoCivil || 'Não informado',
-                    hobbies: hobbies || 'Não informado'
-                };
-                fs.writeFileSync('./perfis.json', JSON.stringify(perfis, null, 2));
-                return await sock.sendMessage(jid, { text: '✅ *Perfil updated com sucesso!* Digite !perfil para ver seu cartão.' });
+        if (mutados.includes(sender)) {
+            try {
+                return await sock.sendMessage(jid, { delete: m.key });
+            } catch {
+                return;
             }
         }
 
-        let isSenderAdmin = (isSupremo || sender === DONO_ADMIN);
+        const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || "");
+
+        let isSenderAdmin = (sender === DONO_SUPREMO || sender === DONO_ADMIN);
         if (jid.endsWith('@g.us') && !isSenderAdmin) {
             try {
                 const metadata = await sock.groupMetadata(jid);
@@ -166,45 +196,29 @@ async function startAtrinoBot() {
             await sock.sendMessage(jid, { text: `📢 *Chamada Geral no Salão!*`, mentions: participants });
         }
 
-        if (!isCmd) return;
+        if (!body.startsWith('!')) return;
 
-        const args = fullText.slice(1).trim().split(/ +/);
+        const args = body.slice(1).trim().split(/ +/);
         const command = args.shift().toLowerCase();
         let mentions = m.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const getMention = () => mentions[0] || m.message.extendedTextMessage?.contextInfo?.participant;
 
-        if (isSupremo && command === 'off') { botSilenciado = true; return sock.sendMessage(jid, { text: '🔇 Bot OFF.' }); }
-        if (isSupremo && command === 'on') { botSilenciado = false; return sock.sendMessage(jid, { text: '🔊 Bot ON.' }); }
+        if (sender === DONO_SUPREMO && command === 'off') { botSilenciado = true; return sock.sendMessage(jid, { text: '🔇 Bot OFF.' }); }
+        if (sender === DONO_SUPREMO && command === 'on') { botSilenciado = false; return sock.sendMessage(jid, { text: '🔊 Bot ON.' }); }
         if (botSilenciado) return;
 
         switch (command) {
-            case 'register':
-                if (!isSupremo) return;
-                gruposAutorizados[jid] = true;
-                await sock.sendMessage(jid, { text: '✅ *Grupo registrado com sucesso!* Agora responderei aos comandos aqui.' });
-                break;
-
-            case 'unregister':
-                if (!isSupremo) return;
-                delete gruposAutorizados[jid];
-                await sock.sendMessage(jid, { text: '🚫 *Grupo removido!* Adeus.' });
-                await sock.groupLeave(jid);
-                break;
-
             case 'menu':
+                // 🔒 Nova trava: Se não for admin ou dono, o bot ignora ou avisa
                 if (!isSenderAdmin) {
                     return await sock.sendMessage(jid, { text: '❌ Apenas administradores podem ver o menu!' }, { quoted: m });
                 }
-                
+
                 const menu = `╭─── [ ATRINO BOT ] ───╮
 │
-│ 🧑‍🤝‍🧑 *Público:*
-│ ➥ !mat @user1 @user2 - Cupido
+│ 🧑‍🤝‍🧑 *Membros:*
+│ ➥ !play [nome] - Tocar música
 │ ➥ !s - Figurinha (Foto)
-│ ➥ !a - Figurinha (Vídeo)
-│ ➥ !play - Música (SoundCloud)
-│ ➥ !editar - Criar/Editar Perfil
-│ ➥ !perfil - Ver seu perfil ou de alguém
 │
 │ 👮 *Admin:*
 │ ➥ !tornaadm @user - Dar Admin
@@ -213,6 +227,7 @@ async function startAtrinoBot() {
 │ ➥ !unadv @user - Remover adv
 │ ➥ !mute @user - Silenciar
 │ ➥ !desmute @user - Liberar
+│ ➥ !fixar - Fixar mensagem
 │ ➥ !ban @user - Banir
 │ ➥ !abrir - Abrir grupo
 │ ➥ !fechar - Fechar grupo
@@ -223,19 +238,93 @@ async function startAtrinoBot() {
                 break;
 
             case 'play':
-                if (!args.length || estaBaixando) return;
-                estaBaixando = true;
-                const query = args.join(' ');
-                await sock.sendMessage(jid, { text: `🎧 Buscando no SoundCloud: *${query}*...` });
-                const filePath = `./${Date.now()}.mp3`;
-                const cmd = `yt-dlp --no-check-certificates --max-filesize 50M "scsearch1:${query}" -x --audio-format mp3 -o "${filePath}"`;
-                exec(cmd, async (err) => {
-                    if (!err && fs.existsSync(filePath)) {
-                        await sock.sendMessage(jid, { audio: { url: filePath }, mimetype: 'audio/mp4' }, { quoted: m });
-                        fs.unlinkSync(filePath);
-                    } else { sock.sendMessage(jid, { text: '❌ Erro ao baixar música do SoundCloud.' }); }
-                    estaBaixando = false;
-                });
+                try {
+                    const busca = args.join(' ');
+                    if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link! Exemplo: !play Nome da Musica' }, { quoted: m });
+
+                    await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}" no SoundCloud...` }, { quoted: m });
+
+                    let urlDoSoundcloud = busca;
+
+                    if (!busca.startsWith('https://')) {
+                        const resultados = await client.search(busca, 'track');
+                        if (resultados.length === 0) {
+                            return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome.' }, { quoted: m });
+                        }
+                        urlDoSoundcloud = resultados[0].url;
+                    }
+
+                    const musicaInfo = await client.getSongInfo(urlDoSoundcloud);
+                    const streamDeAudio = await musicaInfo.downloadProgressive();
+                    
+                    const nomeDoArquivo = path.join(__dirname, `${Date.now()}.mp3`);
+                    const writeStream = fs.createWriteStream(nomeDoArquivo);
+                    
+                    streamDeAudio.pipe(writeStream);
+
+                    writeStream.on('finish', async () => {
+                        try {
+                            const stats = fs.statSync(nomeDoArquivo);
+                            if (stats.size === 0) {
+                                throw new Error("Arquivo baixado está vazio.");
+                            }
+
+                            await sock.sendMessage(jid, { text: `🎧 Enviando: *${musicaInfo.title}*\n👤 Artista: ${musicaInfo.author.name}` });
+
+                            const audioBuffer = fs.readFileSync(nomeDoArquivo);
+
+                            await sock.sendMessage(jid, { 
+                                audio: audioBuffer, 
+                                mimetype: 'audio/mpeg', 
+                                ptt: true 
+                            }, { quoted: m });
+
+                        } catch (sendErr) {
+                            console.error('Erro ao enviar o arquivo de áudio:', sendErr);
+                            await sock.sendMessage(jid, { text: '❌ Não foi possível processar ou enviar este áudio.' }, { quoted: m });
+                        } finally {
+                            if (fs.existsSync(nomeDoArquivo)) {
+                                fs.unlinkSync(nomeDoArquivo);
+                            }
+                        }
+                    });
+
+                    writeStream.on('error', async (err) => {
+                        console.error('Erro durante a gravação do áudio:', err);
+                        await sock.sendMessage(jid, { text: '❌ Ocorreu um erro ao salvar o áudio no servidor.' }, { quoted: m });
+                        if (fs.existsSync(nomeDoArquivo)) {
+                            fs.unlinkSync(nomeDoArquivo);
+                        }
+                    });
+
+                } catch (playErr) {
+                    console.error('Erro geral no comando play:', playErr);
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o comando !play.' }, { quoted: m });
+                }
+                break;
+
+            case 's':
+            case 'sticker':
+                try {
+                    const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const imgS = m.message.imageMessage || quotedS?.imageMessage;
+                    if (imgS) {
+                        const stream = await downloadContentFromMessage(imgS, 'image');
+                        let buffer = Buffer.from([]);
+                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                        
+                        const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Garibaldo356', type: StickerTypes.FULL });
+                        await sock.sendMessage(jid, await sticker.toMessage());
+                        
+                        try {
+                            await sock.sendMessage(jid, { delete: m.key });
+                        } catch (delErr) {
+                            console.log('Erro ao deletar imagem (Verifique se o bot é Admin):', delErr.message);
+                        }
+                    }
+                } catch (stkErr) {
+                    console.error('Erro no comando de sticker:', stkErr);
+                }
                 break;
 
             case 'tornaadm':
@@ -244,32 +333,6 @@ async function startAtrinoBot() {
                 if (!userToAdmin) return sock.sendMessage(jid, { text: '❌ Mencione alguém!' });
                 await sock.groupParticipantsUpdate(jid, [userToAdmin], "promote");
                 await sock.sendMessage(jid, { text: `✅ @${userToAdmin.split('@')[0]} agora é Admin!`, mentions: [userToAdmin] });
-                break;
-
-            case 'mat':
-                if (body.toLowerCase().includes('@eu') && !mentions.includes(sender)) {
-                    mentions.push(sender);
-                }
-                if (mentions.length !== 2) return sock.sendMessage(jid, { text: '❌ Mencione 2 pessoas: !mat @user1 @user2' });
-                
-                try {
-                    await sock.sendMessage(jid, { text: '❤️ *Montando o clima amoroso...*' });
-                    let p1, p2;
-                    try { p1 = await sock.profilePictureUrl(mentions[0], 'image'); } catch { p1 = 'https://i.imgur.com/83p1qS6.png'; }
-                    try { p2 = await sock.profilePictureUrl(mentions[1], 'image'); } catch { p2 = 'https://i.imgur.com/83p1qS6.png'; }
-                    const img1 = await Jimp.read(p1);
-                    const img2 = await Jimp.read(p2);
-                    const heart = await Jimp.read('https://i.imgur.com/Ewx3c4P.png');
-                    img1.resize(300, 300); img2.resize(300, 300); heart.resize(150, 150);
-                    const canvas = new Jimp(750, 350, 0x00000000);
-                    canvas.composite(img1, 50, 25); canvas.composite(img2, 400, 25); canvas.composite(heart, 300, 100);
-                    const outPath = `./match_${Date.now()}.png`;
-                    await canvas.writeAsync(outPath);
-                    const chance = Math.floor(Math.random() * 101);
-                    const msg = `╭─── [ ❤️ *ATURINO MATCH* ] ───╮\n│\n│ ✨ @${mentions[0].split('@')[0]} & @${mentions[1].split('@')[0]}\n│ ❤️ *Chance:* ${chance}%\n╰──────────────────────╯`;
-                    await sock.sendMessage(jid, { image: { url: outPath }, caption: msg, mentions: mentions });
-                    if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
-                } catch (e) { sock.sendMessage(jid, { text: '❌ Erro ao gerar Match.' }); }
                 break;
 
             case 'mute':
@@ -305,31 +368,6 @@ async function startAtrinoBot() {
                 }
                 break;
 
-            case 's':
-            case 'sticker':
-                const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                const imgS = m.message.imageMessage || quotedS?.imageMessage;
-                if (imgS) {
-                    const stream = await downloadContentFromMessage(imgS, 'image');
-                    let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                    const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Garibaldo356', type: StickerTypes.FULL });
-                    await sock.sendMessage(jid, await sticker.toMessage());
-                }
-                break;
-
-            case 'a':
-                const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                const vidA = m.message.videoMessage || quotedA?.videoMessage;
-                if (vidA && vidA.seconds <= 10) {
-                    const stream = await downloadContentFromMessage(vidA, 'video');
-                    let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                    const sticker = new Sticker(buffer, { pack: 'Animado', author: 'Garibaldo356', type: StickerTypes.FULL, quality: 30 });
-                    await sock.sendMessage(jid, await sticker.toMessage());
-                }
-                break;
-
             case 'totag':
                 if (!isSenderAdmin) return;
                 const metadata = await sock.groupMetadata(jid);
@@ -357,37 +395,36 @@ async function startAtrinoBot() {
                 if (isSenderAdmin && getMention()) await sock.groupParticipantsUpdate(jid, [getMention()], "remove");
                 break;
 
-            case 'editar':
-                const instrucao = `📝 *CONFIGURAÇÃO DE PERFIL*\n\nCopie a lista abaixo, preencha seus dados e envie a mensagem contendo o comando *!editapronto* no final.\n\nIdade: \nSexualidade: \nEstado Civil: \nHobbies: \n\n*!editapronto*`;
-                await sock.sendMessage(jid, { text: instrucao }, { quoted: m });
-                break;
-
-            case 'perfil':
-                const target = getMention() || sender;
-                const perfil = perfis[target];
-
-                if (!perfil) {
-                    return sock.sendMessage(jid, { text: target === sender ? '❌ Você ainda não tem um perfil. Use *!editar* para criar!' : '❌ Este usuário ainda não configurou um perfil.' });
+            case 'fixar':
+                if (!isSenderAdmin) return;
+                const quotedFix = m.message.extendedTextMessage?.contextInfo;
+                if (!quotedFix || !quotedFix.stanzaId) {
+                    return sock.sendMessage(jid, { text: '❌ Responda à mensagem que deseja fixar!' });
                 }
 
-                let ppPerfil;
+                const botJid = jidNormalizedUser(sock.user.id);
+                const participant = quotedFix.participant || quotedFix.remoteJid;
+
+                const keyToPin = {
+                    remoteJid: jid,
+                    fromMe: participant === botJid,
+                    id: quotedFix.stanzaId,
+                    participant: participant
+                };
+
                 try {
-                    ppPerfil = await sock.profilePictureUrl(target, 'image');
-                } catch {
-                    ppPerfil = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png';
+                    await sock.relayMessage(jid, {
+                        pinInChat: {
+                            key: keyToPin,
+                            type: 1, 
+                            time: 2592000 
+                        }
+                    }, {});
+                } catch (err) {
+                    console.error('Erro ao fixar mensagem:', err);
+                    await sock.sendMessage(jid, { text: '❌ Erro ao fixar. Verifique se sou administrador do grupo.' });
                 }
-
-                const textoPerfil = `╭─── [ 👤 *PERFIL DO USUÁRIO* ] ───╮\n│\n│ 👤 *Nome:* @${target.split('@')[0]}\n│ 🎂 *Idade:* ${perfil.idade}\n│ 🌈 *Sexualidade:* ${perfil.sexualidade}\n│ 💍 *Estado Civil:* ${perfil.estadoCivil}\n│ 🎨 *Hobbies:* ${perfil.hobbies}\n│\n╰──────────────────────────╯`;
-
-                await sock.sendMessage(jid, { 
-                    image: { url: ppPerfil }, 
-                    caption: textoPerfil, 
-                    mentions: [target] 
-                }, { quoted: m });
                 break;
-
-            case 'ping': await sock.sendMessage(jid, { text: '🏓 Pong!' }); break;
-            case 'id': await sock.sendMessage(jid, { text: `👤 ID: ${sender}` }); break;
         }
     });
 }
