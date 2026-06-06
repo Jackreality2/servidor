@@ -11,6 +11,7 @@
   "author": "Bia cheiras Eventos BOT",
   "license": "ISC",
   "dependencies": {
+    "@distube/ytdl-core": "^4.15.8",
     "@hapi/boom": "^10.0.1",
     "@whiskeysockets/baileys": "^7.0.0-rc13",
     "axios": "^1.16.1",
