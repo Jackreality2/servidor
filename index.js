@@ -31,6 +31,7 @@ let advertencias = {};
 let botSilenciado = false;
 let cooldowns = {};
 let qrAtual = null; // 🚀 Armazena o QR Code ativo para renderizar na Web do Render
+let estatisticas = {};
 
 // --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
 const PORT = parseInt(process.env.PORT, 10) || 7860;
@@ -179,6 +180,18 @@ async function startAtrinoBot() {
         const jid = m.key.remoteJid;
         if (!jid.endsWith('@g.us')) return; 
         const sender = m.key.participant || m.key.remoteJid;
+
+        // --- SISTEMA DE CONTAGEM DE ATIVIDADE ---
+        if (!estatisticas[jid]) estatisticas[jid] = {};
+        if (!estatisticas[jid][sender]) {
+            estatisticas[jid][sender] = { mensagens: 0, fotos: 0, videos: 0, figurinhas: 0, total: 0 };
+        }
+        const userActivity = estatisticas[jid][sender];
+        userActivity.total++;
+        if (m.message.conversation || m.message.extendedTextMessage) userActivity.mensagens++;
+        else if (m.message.imageMessage) userActivity.fotos++;
+        else if (m.message.videoMessage) userActivity.videos++;
+        else if (m.message.stickerMessage) userActivity.figurinhas++;
         
         if (mutados.includes(sender)) {
             try {
@@ -204,7 +217,7 @@ async function startAtrinoBot() {
             await sock.sendMessage(jid, { text: `📢 *Chamada Geral no Salão!*`, mentions: participants });
         }
 
-        if (!body.startsWith('!')) return;
+        if (!body.startsWith('.')) return;
 
         const args = body.slice(1).trim().split(/ +/);
         const command = args.shift().toLowerCase();
@@ -234,20 +247,23 @@ async function startAtrinoBot() {
                 const menu = `╭─── [ ATRINO BOT ] ───╮
 │
 │ 🧑‍🤝‍🧑 *Membros:*
-│ ➥ !s - Figurinha (Foto)
+│ ➥ .s - Figurinha (Foto)
+│ ➥ .contado - Ver minhas estatísticas
+│ ➥ .id - Ver ID do grupo
 │
 │ 👮 *Admin:*
-│ ➥ !play [nome] - Tocar música
-│ ➥ !tornaadm @user - Dar Admin
-│ ➥ !totag - Marcar o grupo
-│ ➥ !adv @user - Dar advertência
-│ ➥ !unadv @user - Remover adv
-│ ➥ !mute @user - Silenciar
-│ ➥ !desmute @user - Liberar
-│ ➥ !fixar - Fixar mensagem
-│ ➥ !ban @user - Banir
-│ ➥ !abrir - Abrir grupo
-│ ➥ !fechar - Fechar grupo
+│ ➥ .play [nome] - Tocar música
+│ ➥ .ranking - Lista de mais ativos
+│ ➥ .tornaadm @user - Dar Admin
+│ ➥ .totag - Marcar o grupo
+│ ➥ .adv @user - Dar advertência
+│ ➥ .unadv @user - Remover adv
+│ ➥ .mute @user - Silenciar
+│ ➥ .desmute @user - Liberar
+│ ➥ .fixar - Fixar mensagem
+│ ➥ .ban @user - Banir
+│ ➥ .abrir - Abrir grupo
+│ ➥ .fechar - Fechar grupo
 │ ➥ @name - Mencionar todos
 │
 ╰───────────────────╯`;
@@ -263,7 +279,7 @@ async function startAtrinoBot() {
                     }
 
                     const busca = args.join(' ');
-                    if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link! Exemplo: !play Nome da Musica' }, { quoted: m });
+                    if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link! Exemplo: .play Nome da Musica' }, { quoted: m });
 
                     await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}"...` }, { quoted: m });
 
@@ -432,6 +448,42 @@ async function startAtrinoBot() {
                     console.error('Erro ao fixar mensagem:', err);
                     await sock.sendMessage(jid, { text: '❌ Erro ao fixar. Verifique se sou administrador do grupo.' });
                 }
+                break;
+
+            case 'id':
+                await sock.sendMessage(jid, { text: `🆔 *ID deste grupo:* ${jid}` }, { quoted: m });
+                break;
+
+            case 'contado':
+                const sStats = estatisticas[jid]?.[sender];
+                if (!sStats) return sock.sendMessage(jid, { text: '❌ Você ainda não possui registros de atividade neste grupo.' }, { quoted: m });
+                
+                let personalStats = `📊 *SUAS ESTATÍSTICAS*\n\n`;
+                personalStats += `👤 @${sender.split('@')[0]}\n`;
+                personalStats += `💬 Mensagens: ${sStats.mensagens}\n`;
+                personalStats += `🖼️ Fotos: ${sStats.fotos}\n`;
+                personalStats += `📹 Vídeos: ${sStats.videos}\n`;
+                personalStats += `🗿 Figurinhas: ${sStats.figurinhas}\n`;
+                personalStats += `📈 Total de interações: ${sStats.total}`;
+                
+                await sock.sendMessage(jid, { text: personalStats, mentions: [sender] }, { quoted: m });
+                break;
+
+            case 'ranking':
+                if (!isSenderAdmin) return sock.sendMessage(jid, { text: '❌ Comando restrito a administradores!' }, { quoted: m });
+                if (!estatisticas[jid] || Object.keys(estatisticas[jid]).length === 0) return sock.sendMessage(jid, { text: '❌ Ainda não há dados de atividade para gerar o ranking.' });
+
+                const sortedActivity = Object.entries(estatisticas[jid])
+                    .sort(([, a], [, b]) => b.total - a.total)
+                    .slice(0, 10);
+
+                let rankMsg = `🏆 *RANKING DE ATIVIDADE - TOP 10* 🏆\n\n`;
+                sortedActivity.forEach(([user, data], index) => {
+                    rankMsg += `${index + 1}º - @${user.split('@')[0]}\n`;
+                    rankMsg += `   💬 Msg: ${data.mensagens} | 🖼️: ${data.fotos} | 📹: ${data.videos} | 🗿: ${data.figurinhas}\n\n`;
+                });
+
+                await sock.sendMessage(jid, { text: rankMsg, mentions: sortedActivity.map(([u]) => u) });
                 break;
         }
     });
