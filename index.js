@@ -28,6 +28,7 @@ const ID_DO_GRUPO = '120363425471646460@g.us';
  
 let mutados = [];
 let advertencias = {}; 
+let historicoComandos = [];
 let botSilenciado = false;
 let cooldowns = {};
 let qrAtual = null; // 🚀 Armazena o QR Code ativo para renderizar na Web do Render
@@ -292,11 +293,18 @@ async function startAtrinoBot() {
         const args = body.slice(1).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // --- LOG DE COMANDO PARA RESPOSTAS ---
-        const agoraCmd = new Date();
-        const horarioCmd = agoraCmd.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        const dataCmd = agoraCmd.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        const logComando = `\n\n*COMANDO SOLICITADO POR:* @${sender.split('@')[0]} : ${horarioCmd} : ${dataCmd}`;
+        // --- REGISTRO DE HISTÓRICO PARA O RELATÓRIO ---
+        const agoraLog = new Date();
+        const horarioLog = agoraLog.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const dataLog = agoraLog.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        
+        historicoComandos.push({
+            comando: command,
+            usuario: sender,
+            horario: horarioLog,
+            data: dataLog
+        });
+        if (historicoComandos.length > 50) historicoComandos.shift(); // Mantém os últimos 50 comandos
 
         // --- SISTEMA DE COOLDOWN (10 SEGUNDOS) ---
         const agora = Date.now();
@@ -357,10 +365,11 @@ async function startAtrinoBot() {
 │ ➥ .ban @user - Banir
 │ ➥ .abrir - Abrir grupo
 │ ➥ .fechar - Fechar grupo
+│ ➥ .relatorio - Log de comandos
 │ ➥ @name - Mencionar todos
 │
 ╰───────────────────╯`;
-                await sock.sendMessage(jid, { text: menu + logComando, mentions: [sender] }, { quoted: m });
+                await sock.sendMessage(jid, { text: menu }, { quoted: m });
                 break;
 
             case 'play':
@@ -423,18 +432,14 @@ async function startAtrinoBot() {
             case 's':
             case 'sticker':
                 try {
+                    // Verificação de Saldo (Custo Dinâmico)
+                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
+                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.\n\n🎮 Jogue o anagrama (.ativar_anagrama) para ganhar moedas!` }, { quoted: m });
+                    }
+
                     const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
                     const imgS = m.message.imageMessage || quotedS?.imageMessage;
-
                     if (imgS) {
-                        // Apaga a mensagem independente de ter saldo ou não
-                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
-
-                        // Verificação de Saldo (Custo Dinâmico)
-                        if ((saldosUFSC[sender] || 0) < precoFigurinha) {
-                            return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.\n\n🎮 Jogue o anagrama (.ativar_anagrama) para ganhar moedas!${logComando}`, mentions: [sender] });
-                        }
-
                         const stream = await downloadContentFromMessage(imgS, 'image');
                         let buffer = Buffer.from([]);
                         for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
@@ -443,8 +448,12 @@ async function startAtrinoBot() {
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
-                    } else {
-                        await sock.sendMessage(jid, { text: '❌ Envie uma foto ou responda a uma com .s' + logComando, mentions: [sender] });
+                        
+                        try {
+                            await sock.sendMessage(jid, { delete: m.key });
+                        } catch (delErr) {
+                            console.log('Erro ao deletar imagem (Verifique se o bot é Admin):', delErr.message);
+                        }
                     }
                 } catch (stkErr) {
                     console.error('Erro no comando de sticker:', stkErr);
@@ -454,18 +463,15 @@ async function startAtrinoBot() {
             case 'a':
             case 'animada':
                 try {
+                    // Verificação de Saldo (Custo Dinâmico)
+                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
+                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha animada.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.` }, { quoted: m });
+                    }
+
                     const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
                     const vidA = m.message.videoMessage || quotedA?.videoMessage;
                     
                     if (vidA) {
-                        // Apaga a mensagem independente de ter saldo ou não
-                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
-
-                        // Verificação de Saldo (Custo Dinâmico)
-                        if ((saldosUFSC[sender] || 0) < precoFigurinha) {
-                            return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha animada.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.${logComando}`, mentions: [sender] });
-                        }
-
                         if (vidA.seconds > 10) return sock.sendMessage(jid, { text: '❌ O vídeo deve ter no máximo 10 segundos para virar figurinha!' }, { quoted: m });
 
                         const stream = await downloadContentFromMessage(vidA, 'video');
@@ -482,8 +488,10 @@ async function startAtrinoBot() {
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
+                        
+                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
                     } else {
-                        await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' + logComando, mentions: [sender] });
+                        await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' }, { quoted: m });
                     }
                 } catch (err) {
                     console.error('Erro no comando .a:', err);
@@ -497,6 +505,48 @@ async function startAtrinoBot() {
                 if (!userToAdmin) return sock.sendMessage(jid, { text: '❌ Mencione alguém!' });
                 await sock.groupParticipantsUpdate(jid, [userToAdmin], "promote");
                 await sock.sendMessage(jid, { text: `✅ @${userToAdmin.split('@')[0]} agora é Admin!`, mentions: [userToAdmin] });
+                break;
+
+            case 'relatorio':
+                if (!isSenderAdmin) return;
+                // Reação inicial com emoji de positivo
+                await sock.sendMessage(jid, { react: { text: '👍', key: m.key } });
+
+                let relTexto = "📋 *RELATÓRIO DE COMANDOS EXECUTADOS*\n\n";
+                if (historicoComandos.length === 0) {
+                    relTexto += "_Nenhum comando registrado no histórico._";
+                } else {
+                    historicoComandos.forEach((h, i) => {
+                        relTexto += `${i + 1}. .${h.comando} - @${h.usuario.split('@')[0]} : ${h.horario} : ${h.data}\n`;
+                    });
+                }
+
+                const buttons = [
+                    { buttonId: '.relpdf', buttonText: { displayText: '📄 Transformar em PDF' }, type: 1 }
+                ];
+
+                await sock.sendMessage(jid, { 
+                    text: relTexto, 
+                    footer: 'Atrino Bot - Sistema de Auditoria',
+                    buttons: buttons,
+                    headerType: 1,
+                    mentions: historicoComandos.map(h => h.usuario)
+                });
+                break;
+
+            case 'relpdf':
+                if (!isSenderAdmin) return;
+                let contentPdf = "📋 RELATÓRIO DE COMANDOS - ATRINO BOT\n" + "=".repeat(40) + "\n\n";
+                historicoComandos.forEach((h, i) => {
+                    contentPdf += `${i + 1}. Comando: .${h.comando}\n   Usuário: ${h.usuario}\n   Data: ${h.data} | Hora: ${h.horario}\n\n`;
+                });
+                
+                await sock.sendMessage(jid, { 
+                    document: Buffer.from(contentPdf), 
+                    mimetype: 'application/pdf', 
+                    fileName: 'relatorio_comandos.pdf',
+                    caption: '✅ Aqui está o seu relatório detalhado em PDF.'
+                });
                 break;
 
             case 'mute':
