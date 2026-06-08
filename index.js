@@ -320,6 +320,7 @@ async function startAtrinoBot() {
 │ 👮 *Admin:*
 │ ➥ .play [nome] - Tocar música
 │ ➥ .contador - Ativar/Desativar contagem
+│ ➥ .citar - Marcar alvo para flood
 │ ➥ .doar @user [valor] - Dar moedas
 │ ➥ .mudapreço_fig_[valor] - Mudar custo
 │ ➥ .id - Ver ID do grupo
@@ -689,6 +690,27 @@ async function startAtrinoBot() {
                     text: `💰 *DOAÇÃO REALIZADA!*\n\n👤 Beneficiário: @${userDoar.split('@')[0]}\n🪙 Valor: ${valorDoar} UFSC\n📈 Novo saldo: ${saldosUFSC[userDoar]} UFSC`,
                     mentions: [userDoar] 
                 }, { quoted: m });
+                break;
+
+            case 'citar':
+                if (!isSenderAdmin) return;
+                const contextCitar = m.message.extendedTextMessage?.contextInfo;
+                if (!contextCitar || !contextCitar.stanzaId) {
+                    return sock.sendMessage(jid, { text: '❌ Responda a uma mensagem para usar o .citar!' }, { quoted: m });
+                }
+
+                const targetParticipant = contextCitar.participant || contextCitar.remoteJid;
+                await sock.sendMessage(jid, { text: 'FLOODEM , INVADA AGORA' }, { 
+                    quoted: { 
+                        key: {
+                            remoteJid: jid,
+                            fromMe: targetParticipant === jidNormalizedUser(sock.user.id),
+                            id: contextCitar.stanzaId,
+                            participant: targetParticipant
+                        }, 
+                        message: contextCitar.quotedMessage 
+                    } 
+                });
                 break;
         }
     });
