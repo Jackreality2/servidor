@@ -532,14 +532,15 @@ async function startAtrinoBot() {
             case 'match':
                 try {
                     // Verificação de Saldo (Custo Dinâmico igual figurinha)
-                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
-                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nO custo do Match é *${precoFigurinha} UFSC*.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.` }, { quoted: m });
+                    const saldoAtual = saldosUFSC[sender] || 0;
+                    if (saldoAtual < precoFigurinha) {
+                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nO custo do Match é *${precoFigurinha} UFSC*.\n💰 Seu saldo atual: ${saldoAtual} UFSC.` }, { quoted: m });
                     }
 
                     let t1, t2;
                     const mentionsMatch = m.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
 
-                    if (body.toLowerCase().includes('@eu')) {
+                    if (body.toLowerCase().includes('@eu') || body.toLowerCase().includes(' eu ')) {
                         t1 = sender;
                         t2 = mentionsMatch.find(v => v !== sender) || mentionsMatch[0];
                     } else {
@@ -548,44 +549,28 @@ async function startAtrinoBot() {
                     }
 
                     if (!t1 || !t2 || t1 === t2) {
-                        return sock.sendMessage(jid, { text: '❌ Erro! Use: .mat @eu @pessoa ou .mat @pessoa1 @pessoa2' }, { quoted: m });
+                        return sock.sendMessage(jid, { text: '❌ *ERRO DE ALVO*\n\nUse: .mat @eu @pessoa\nOu: .mat @pessoa1 @pessoa2' }, { quoted: m });
                     }
 
-                    await sock.sendMessage(jid, { text: '🏹 O cupido está analisando a conexão...' }, { quoted: m });
-
-                    const fallbackImg = 'https://ui-avatars.com/api/?name=User&background=random&size=250';
-                    let p1, p2;
-                    try { p1 = await sock.profilePictureUrl(t1, 'image'); } catch { p1 = fallbackImg; }
-                    try { p2 = await sock.profilePictureUrl(t2, 'image'); } catch { p2 = fallbackImg; }
-
-                    // Carrega as imagens em paralelo com tratamento de erro individual para evitar crash no Render
-                    const [img1, img2, heart] = await Promise.all([
-                        Jimp.read(p1).catch(() => Jimp.read(fallbackImg)),
-                        Jimp.read(p2).catch(() => Jimp.read(fallbackImg)),
-                        Jimp.read('https://i.imgur.com/8mS9Ym6.png').catch(async () => {
-                            // Se o Imgur falhar (comum no Render), cria um bloco vermelho como fallback
-                            const h = new Jimp(150, 150, 0xFF0000FF);
-                            return h;
-                        })
-                    ]);
-
-                    img1.resize(250, 250);
-                    img2.resize(250, 250);
-                    heart.resize(150, 150);
-
-                    const canvas = new Jimp(650, 250, 0x00000000); // Fundo transparente
-                    canvas.composite(img1, 0, 0);
-                    canvas.composite(heart, 250, 50);
-                    canvas.composite(img2, 400, 0);
-
-                    const buffer = await canvas.getBufferAsync(Jimp.MIME_PNG);
                     const lovePerc = Math.floor(Math.random() * 101);
+                    let coracao = lovePerc > 75 ? "❤️‍🔥" : lovePerc > 50 ? "💖" : lovePerc > 25 ? "🧡" : "💔";
                     
-                    let fraseAmor = lovePerc > 80 ? "🔥 UM CASAL EXPLOSIVO!" : lovePerc > 50 ? "💖 Tem futuro, hein!" : "📉 Melhor ficarem só na amizade.";
+                    let fraseAmor = lovePerc > 85 ? " UM CASAL LENDÁRIO! A química é absoluta." : 
+                                    lovePerc > 60 ? "💖 Tem muito futuro! O cupido acertou em cheio." : 
+                                    lovePerc > 40 ? "⚖️ Tem chance, mas precisam sair do zero a zero." : 
+                                    "📉 A vibe não bateu... Melhor ficarem na amizade.";
+
+                    const layoutMatch = `✨ 💘 *ORÁCULO DO AMOR* 💘 ✨\n` +
+                                      `━━━━━━━━━━━━━━━━━\n\n` +
+                                      `👤 @${t1.split('@')[0]}\n` +
+                                      `      ${coracao} *${lovePerc}%* ${coracao}\n` +
+                                      `👤 @${t2.split('@')[0]}\n\n` +
+                                      `📝 *Veredito:* ${fraseAmor}\n\n` +
+                                      `━━━━━━━━━━━━━━━━━\n` +
+                                      `💰 *Custo:* ${precoFigurinha} UFSC`;
 
                     await sock.sendMessage(jid, { 
-                        image: buffer, 
-                        caption: `💘 *MATCH DETECTADO* 💘\n\n👤 @${t1.split('@')[0]}\n👤 @${t2.split('@')[0]}\n\n✨ Afinidade: *${lovePerc}%*\n📝 ${fraseAmor}\n\n💰 Custo: ${precoFigurinha} UFSC`,
+                        text: layoutMatch,
                         mentions: [t1, t2]
                     }, { quoted: m });
 
@@ -593,7 +578,7 @@ async function startAtrinoBot() {
 
                 } catch (err) {
                     console.error('Erro no comando match:', err);
-                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o Match. Verifique se as fotos são acessíveis. (Suas moedas não foram descontadas)' });
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o Match. Suas moedas não foram descontadas.' });
                 }
                 break;
 
