@@ -423,14 +423,18 @@ async function startAtrinoBot() {
             case 's':
             case 'sticker':
                 try {
-                    // Verificação de Saldo (Custo Dinâmico)
-                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
-                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.\n\n🎮 Jogue o anagrama (.ativar_anagrama) para ganhar moedas!` }, { quoted: m });
-                    }
-
                     const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
                     const imgS = m.message.imageMessage || quotedS?.imageMessage;
+
                     if (imgS) {
+                        // Apaga a mensagem independente de ter saldo ou não
+                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
+
+                        // Verificação de Saldo (Custo Dinâmico)
+                        if ((saldosUFSC[sender] || 0) < precoFigurinha) {
+                            return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.\n\n🎮 Jogue o anagrama (.ativar_anagrama) para ganhar moedas!${logComando}`, mentions: [sender] });
+                        }
+
                         const stream = await downloadContentFromMessage(imgS, 'image');
                         let buffer = Buffer.from([]);
                         for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
@@ -439,12 +443,8 @@ async function startAtrinoBot() {
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
-                        
-                        try {
-                            await sock.sendMessage(jid, { delete: m.key });
-                        } catch (delErr) {
-                            console.log('Erro ao deletar imagem (Verifique se o bot é Admin):', delErr.message);
-                        }
+                    } else {
+                        await sock.sendMessage(jid, { text: '❌ Envie uma foto ou responda a uma com .s' + logComando, mentions: [sender] });
                     }
                 } catch (stkErr) {
                     console.error('Erro no comando de sticker:', stkErr);
@@ -454,15 +454,18 @@ async function startAtrinoBot() {
             case 'a':
             case 'animada':
                 try {
-                    // Verificação de Saldo (Custo Dinâmico)
-                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
-                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha animada.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.` }, { quoted: m });
-                    }
-
                     const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
                     const vidA = m.message.videoMessage || quotedA?.videoMessage;
                     
                     if (vidA) {
+                        // Apaga a mensagem independente de ter saldo ou não
+                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
+
+                        // Verificação de Saldo (Custo Dinâmico)
+                        if ((saldosUFSC[sender] || 0) < precoFigurinha) {
+                            return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha animada.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.${logComando}`, mentions: [sender] });
+                        }
+
                         if (vidA.seconds > 10) return sock.sendMessage(jid, { text: '❌ O vídeo deve ter no máximo 10 segundos para virar figurinha!' }, { quoted: m });
 
                         const stream = await downloadContentFromMessage(vidA, 'video');
@@ -479,10 +482,8 @@ async function startAtrinoBot() {
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
-                        
-                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
                     } else {
-                        await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' }, { quoted: m });
+                        await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' + logComando, mentions: [sender] });
                     }
                 } catch (err) {
                     console.error('Erro no comando .a:', err);
