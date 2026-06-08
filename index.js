@@ -134,7 +134,8 @@ async function startAtrinoBot() {
     // --- SISTEMA DE BOAS-VINDAS ---
     sock.ev.on('group-participants.update', async (anu) => {
         // 1. Monitoramento de quem ENTRA (via link ou adicionado diretamente)
-        if (anu.action === 'add' && notificacoesAtivas[anu.id]) {
+        if (anu.action === 'add') {
+            if (!notificacoesAtivas[anu.id]) return; // Boas-vindas só se ativado
             for (const participant of anu.participants) {
                 let ppUrl;
                 try {
@@ -148,7 +149,6 @@ async function startAtrinoBot() {
         } 
         
         // 2. Monitoramento de SOLICITAÇÕES (Aprovação de novos membros ativa)
-        // Notificamos sempre para garantir que o admin gerencie as entradas via link
         if (anu.action === 'request') {
             const solicitante = anu.participants[0];
             solicitacoesPendentes[anu.id] = solicitante; // Armazena a última solicitação do grupo
@@ -593,8 +593,22 @@ async function startAtrinoBot() {
 
             case 'aceitar':
                 if (!isSenderAdmin) return;
-                const userAcc = getMention() || solicitacoesPendentes[jid];
-                if (!userAcc) return sock.sendMessage(jid, { text: '❌ Não encontrei nenhuma solicitação recente para aceitar.' });
+                let userAcc = getMention() || solicitacoesPendentes[jid];
+                
+                // Se não tiver na memória, busca direto no servidor do WhatsApp
+                if (!userAcc) {
+                    try {
+                        const requests = await sock.groupRequestParticipantsList(jid);
+                        if (requests && requests.length > 0) {
+                            userAcc = requests[0].jid; // Pega o primeiro da fila
+                        }
+                    } catch (e) {
+                        console.error("Erro ao buscar lista de pedidos:", e);
+                    }
+                }
+
+                if (!userAcc) return sock.sendMessage(jid, { text: '❌ Não há solicitações pendentes para este grupo no momento.' });
+                
                 try {
                     await sock.groupRequestParticipantsUpdate(jid, [userAcc], "approve");
                     await sock.sendMessage(jid, { text: `✅ A solicitação de @${userAcc.split('@')[0]} foi aprovada com sucesso!`, mentions: [userAcc] });
@@ -606,8 +620,19 @@ async function startAtrinoBot() {
 
             case 'recusar':
                 if (!isSenderAdmin) return;
-                const userRec = getMention() || solicitacoesPendentes[jid];
-                if (!userRec) return sock.sendMessage(jid, { text: '❌ Não encontrei nenhuma solicitação recente para recusar.' });
+                let userRec = getMention() || solicitacoesPendentes[jid];
+
+                if (!userRec) {
+                    try {
+                        const requests = await sock.groupRequestParticipantsList(jid);
+                        if (requests && requests.length > 0) {
+                            userRec = requests[0].jid;
+                        }
+                    } catch (e) {}
+                }
+
+                if (!userRec) return sock.sendMessage(jid, { text: '❌ Não há solicitações pendentes para este grupo no momento.' });
+
                 await sock.groupRequestParticipantsUpdate(jid, [userRec], "reject");
                 await sock.sendMessage(jid, { text: `🚫 A solicitação de @${userRec.split('@')[0]} foi recusada.`, mentions: [userRec] });
                 delete solicitacoesPendentes[jid]; // Limpa após processar
