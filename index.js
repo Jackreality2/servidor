@@ -37,6 +37,7 @@ let saldosUFSC = {};
 let anagramaGame = { ativo: false, palavra: "", embaralhada: "", jid: "" };
 let notificacoesAtivas = {};
 let solicitacoesPendentes = {};
+let precoFigurinha = 2;
 let ultimaInteracao = {};
 
 // --- PALAVRAS PARA ANAGRAMA (Simulando IA) ---
@@ -288,6 +289,15 @@ async function startAtrinoBot() {
         }
         cooldowns[sender] = agora;
 
+        // --- COMANDO DINÂMICO DE PREÇO ---
+        if (command.startsWith('mudapreço_fig_')) {
+            if (!isSenderAdmin) return;
+            const novoPreco = parseInt(command.split('_').pop());
+            if (isNaN(novoPreco)) return sock.sendMessage(jid, { text: '❌ Valor inválido. Use por exemplo: .mudapreço_fig_20' });
+            precoFigurinha = novoPreco;
+            return await sock.sendMessage(jid, { text: `✅ O preço das figurinhas foi alterado para: *${precoFigurinha} UFSC*` });
+        }
+
         let mentions = m.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const getMention = () => mentions[0] || m.message.extendedTextMessage?.contextInfo?.participant;
 
@@ -310,6 +320,8 @@ async function startAtrinoBot() {
 │ 👮 *Admin:*
 │ ➥ .play [nome] - Tocar música
 │ ➥ .contador - Ativar/Desativar contagem
+│ ➥ .doar @user [valor] - Dar moedas
+│ ➥ .mudapreço_fig_[valor] - Mudar custo
 │ ➥ .id - Ver ID do grupo
 │ ➥ .ranking - Lista de mais ativos
 │ ➥ .ativar_anagrama - Inicia jogo
@@ -392,9 +404,9 @@ async function startAtrinoBot() {
             case 's':
             case 'sticker':
                 try {
-                    // Verificação de Saldo (Custo: 2 UFSC)
-                    if ((saldosUFSC[sender] || 0) < 2) {
-                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *2 UFSC* para criar uma figurinha.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.\n\n🎮 Jogue o anagrama (.ativar_anagrama) para ganhar moedas!` }, { quoted: m });
+                    // Verificação de Saldo (Custo Dinâmico)
+                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
+                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.\n\n🎮 Jogue o anagrama (.ativar_anagrama) para ganhar moedas!` }, { quoted: m });
                     }
 
                     const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
@@ -407,7 +419,7 @@ async function startAtrinoBot() {
                         const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Garibaldo356', type: StickerTypes.FULL });
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
-                        saldosUFSC[sender] -= 2; // Deduz o custo
+                        saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
                         
                         try {
                             await sock.sendMessage(jid, { delete: m.key });
@@ -423,9 +435,9 @@ async function startAtrinoBot() {
             case 'a':
             case 'animada':
                 try {
-                    // Verificação de Saldo (Custo: 2 UFSC)
-                    if ((saldosUFSC[sender] || 0) < 2) {
-                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *2 UFSC* para criar uma figurinha animada.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.` }, { quoted: m });
+                    // Verificação de Saldo (Custo Dinâmico)
+                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
+                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha animada.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.` }, { quoted: m });
                     }
 
                     const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
@@ -447,7 +459,7 @@ async function startAtrinoBot() {
 
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
-                        saldosUFSC[sender] -= 2; // Deduz o custo
+                        saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
                         
                         try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
                     } else {
@@ -662,6 +674,21 @@ async function startAtrinoBot() {
                 await sock.groupRequestParticipantsUpdate(jid, [userRec], "reject");
                 await sock.sendMessage(jid, { text: `🚫 A solicitação de @${userRec.split('@')[0]} foi recusada.`, mentions: [userRec] });
                 delete solicitacoesPendentes[jid]; // Limpa após processar
+                break;
+
+            case 'doar':
+                if (!isSenderAdmin) return;
+                const userDoar = getMention();
+                const valorDoar = parseInt(args[1]);
+
+                if (!userDoar) return sock.sendMessage(jid, { text: '❌ Mencione o usuário que receberá as moedas!' }, { quoted: m });
+                if (isNaN(valorDoar)) return sock.sendMessage(jid, { text: '❌ Valor inválido! Use: .doar @user 400' }, { quoted: m });
+
+                saldosUFSC[userDoar] = (saldosUFSC[userDoar] || 0) + valorDoar;
+                await sock.sendMessage(jid, { 
+                    text: `💰 *DOAÇÃO REALIZADA!*\n\n👤 Beneficiário: @${userDoar.split('@')[0]}\n🪙 Valor: ${valorDoar} UFSC\n📈 Novo saldo: ${saldosUFSC[userDoar]} UFSC`,
+                    mentions: [userDoar] 
+                }, { quoted: m });
                 break;
         }
     });
