@@ -37,6 +37,7 @@ let saldosUFSC = {};
 let anagramaGame = { ativo: false, palavra: "", embaralhada: "", jid: "" };
 let notificacoesAtivas = {};
 let solicitacoesPendentes = {};
+let ultimaInteracao = {};
 
 // --- PALAVRAS PARA ANAGRAMA (Simulando IA) ---
 const listaPalavras = ["computador", "whatsapp", "javascript", "teclado", "celular", "inteligencia", "programador", "saturno", "banana", "guitarra", "futebol", "universo"];
@@ -214,6 +215,16 @@ async function startAtrinoBot() {
         if (!jid.endsWith('@g.us')) return; 
         const sender = m.key.participant || m.key.remoteJid;
 
+        // --- SISTEMA DE RESET POR INATIVIDADE (5 DIAS) ---
+        const agoraInteracao = Date.now();
+        const CINCO_DIAS_MS = 5 * 24 * 60 * 60 * 1000;
+
+        if (ultimaInteracao[sender] && (agoraInteracao - ultimaInteracao[sender]) > CINCO_DIAS_MS) {
+            saldosUFSC[sender] = 0; // Reset saldo por inatividade
+            console.log(`🧹 Saldo de ${sender} resetado por inatividade de 5 dias.`);
+        }
+        ultimaInteracao[sender] = agoraInteracao; // Atualiza timestamp da última atividade
+
         // --- SISTEMA DE CONTAGEM DE ATIVIDADE ---
         if (contagemAtiva[jid]) {
             if (!estatisticas[jid]) estatisticas[jid] = {};
@@ -381,6 +392,11 @@ async function startAtrinoBot() {
             case 's':
             case 'sticker':
                 try {
+                    // Verificação de Saldo (Custo: 2 UFSC)
+                    if ((saldosUFSC[sender] || 0) < 2) {
+                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *2 UFSC* para criar uma figurinha.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.\n\n🎮 Jogue o anagrama (.ativar_anagrama) para ganhar moedas!` }, { quoted: m });
+                    }
+
                     const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
                     const imgS = m.message.imageMessage || quotedS?.imageMessage;
                     if (imgS) {
@@ -390,6 +406,8 @@ async function startAtrinoBot() {
                         
                         const sticker = new Sticker(buffer, { pack: 'Atrino Bot', author: 'Garibaldo356', type: StickerTypes.FULL });
                         await sock.sendMessage(jid, await sticker.toMessage());
+                        
+                        saldosUFSC[sender] -= 2; // Deduz o custo
                         
                         try {
                             await sock.sendMessage(jid, { delete: m.key });
@@ -405,6 +423,11 @@ async function startAtrinoBot() {
             case 'a':
             case 'animada':
                 try {
+                    // Verificação de Saldo (Custo: 2 UFSC)
+                    if ((saldosUFSC[sender] || 0) < 2) {
+                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *2 UFSC* para criar uma figurinha animada.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.` }, { quoted: m });
+                    }
+
                     const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
                     const vidA = m.message.videoMessage || quotedA?.videoMessage;
                     
@@ -423,6 +446,9 @@ async function startAtrinoBot() {
                         });
 
                         await sock.sendMessage(jid, await sticker.toMessage());
+                        
+                        saldosUFSC[sender] -= 2; // Deduz o custo
+                        
                         try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
                     } else {
                         await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' }, { quoted: m });
