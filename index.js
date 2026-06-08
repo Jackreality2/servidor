@@ -33,6 +33,22 @@ let cooldowns = {};
 let qrAtual = null; // 🚀 Armazena o QR Code ativo para renderizar na Web do Render
 let estatisticas = {};
 let contagemAtiva = {};
+let saldosUFSC = {};
+let anagramaGame = { ativo: false, palavra: "", embaralhada: "", jid: "" };
+let notificacoesAtivas = {};
+
+// --- PALAVRAS PARA ANAGRAMA (Simulando IA) ---
+const listaPalavras = ["computador", "whatsapp", "javascript", "teclado", "celular", "inteligencia", "programador", "saturno", "banana", "guitarra", "futebol", "universo"];
+
+function gerarAnagrama() {
+    const palavra = listaPalavras[Math.floor(Math.random() * listaPalavras.length)];
+    let arr = palavra.split('');
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return { original: palavra, embaralhada: arr.join('').toUpperCase() };
+}
 
 // --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
 const PORT = parseInt(process.env.PORT, 10) || 7860;
@@ -116,6 +132,20 @@ async function startAtrinoBot() {
 
     // --- SISTEMA DE BOAS-VINDAS ---
     sock.ev.on('group-participants.update', async (anu) => {
+        // Notificação de Solicitação de Entrada ou Novos Membros
+        if (notificacoesAtivas[anu.id]) {
+            if (anu.action === 'add') {
+                await sock.sendMessage(anu.id, { text: `📢 *Novo membro detectado:* @${anu.participants[0].split('@')[0]} entrou no salão.`, mentions: anu.participants });
+            } else if (anu.action === 'request') {
+                const solicitante = anu.participants[0];
+                const msgReq = `🔔 *SOLICITAÇÃO DE ENTRADA*\n\n` +
+                               `👤 Contato: @${solicitante.split('@')[0]}\n` +
+                               `🔢 Número: ${solicitante.split('@')[0]}\n\n` +
+                               `Use *.aceitar @user* ou *.recusar @user* para gerenciar.`;
+                await sock.sendMessage(anu.id, { text: msgReq, mentions: [solicitante] });
+            }
+        }
+
         if (anu.action === 'add' && anu.id === ID_DO_GRUPO) {
             for (const participant of anu.participants) {
                 let ppUrl;
@@ -196,6 +226,19 @@ async function startAtrinoBot() {
             else if (m.message.stickerMessage) userActivity.figurinhas++;
         }
         
+        const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || "");
+
+        // --- VERIFICAÇÃO DE RESPOSTA DO ANAGRAMA ---
+        if (anagramaGame.ativo && anagramaGame.jid === jid && body.toLowerCase() === anagramaGame.palavra) {
+            if (!saldosUFSC[sender]) saldosUFSC[sender] = 0;
+            saldosUFSC[sender] += 1;
+            await sock.sendMessage(jid, { text: `🎉 *ACERTOU!* @${sender.split('@')[0]} ganhou 1 moeda UFSC! 🪙\n💰 Saldo atual: ${saldosUFSC[sender]} UFSC.\n\nPróxima palavra vindo...`, mentions: [sender] });
+            const novo = gerarAnagrama();
+            anagramaGame.palavra = novo.original;
+            anagramaGame.embaralhada = novo.embaralhada;
+            return await sock.sendMessage(jid, { text: `🧩 Forme a palavra: *${anagramaGame.embaralhada}*` });
+        }
+
         if (mutados.includes(sender)) {
             try {
                 return await sock.sendMessage(jid, { delete: m.key });
@@ -203,8 +246,6 @@ async function startAtrinoBot() {
                 return;
             }
         }
-
-        const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || "");
 
         let isSenderAdmin = (sender === DONO_SUPREMO || sender === DONO_ADMIN);
         if (jid.endsWith('@g.us') && !isSenderAdmin) {
@@ -251,12 +292,17 @@ async function startAtrinoBot() {
 │
 │ 🧑‍🤝‍🧑 *Membros:*
 │ ➥ .s - Figurinha (Foto)
+│ ➥ .a - Figurinha Animada (Vídeo)
 │
 │ 👮 *Admin:*
 │ ➥ .play [nome] - Tocar música
 │ ➥ .contador - Ativar/Desativar contagem
 │ ➥ .id - Ver ID do grupo
 │ ➥ .ranking - Lista de mais ativos
+│ ➥ .ativar_anagrama - Inicia jogo
+│ ➥ .desativa_anagrama - Para jogo
+│ ➥ .notificar - Avisos de entrada
+│ ➥ .naonotificar - Silenciar avisos
 │ ➥ .tornaadm @user - Dar Admin
 │ ➥ .totag - Marcar o grupo
 │ ➥ .adv @user - Dar advertência
@@ -351,6 +397,37 @@ async function startAtrinoBot() {
                     }
                 } catch (stkErr) {
                     console.error('Erro no comando de sticker:', stkErr);
+                }
+                break;
+
+            case 'a':
+            case 'animada':
+                try {
+                    const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const vidA = m.message.videoMessage || quotedA?.videoMessage;
+                    
+                    if (vidA) {
+                        if (vidA.seconds > 10) return sock.sendMessage(jid, { text: '❌ O vídeo deve ter no máximo 10 segundos para virar figurinha!' }, { quoted: m });
+
+                        const stream = await downloadContentFromMessage(vidA, 'video');
+                        let buffer = Buffer.from([]);
+                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                        
+                        const sticker = new Sticker(buffer, { 
+                            pack: 'Atrino Bot', 
+                            author: 'Garibaldo356', 
+                            type: StickerTypes.FULL,
+                            quality: 50 
+                        });
+
+                        await sock.sendMessage(jid, await sticker.toMessage());
+                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
+                    } else {
+                        await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' }, { quoted: m });
+                    }
+                } catch (err) {
+                    console.error('Erro no comando .a:', err);
+                    await sock.sendMessage(jid, { text: '❌ Erro ao converter vídeo para figurinha.' });
                 }
                 break;
 
@@ -483,6 +560,54 @@ async function startAtrinoBot() {
                 });
 
                 await sock.sendMessage(jid, { text: rankMsg, mentions: sortedActivity.map(([u]) => u) });
+                break;
+
+            case 'ativar_anagrama':
+                if (!isSenderAdmin) return sock.sendMessage(jid, { text: '❌ Apenas ADMs podem ativar o jogo.' });
+                if (anagramaGame.ativo) return sock.sendMessage(jid, { text: '🕹️ O jogo já está rolando!' });
+                
+                const jogo = gerarAnagrama();
+                anagramaGame = { ativo: true, palavra: jogo.original, embaralhada: jogo.embaralhada, jid: jid };
+                await sock.sendMessage(jid, { text: `🎮 *ANAGRAMA ATIVADO!*\n\nForme a palavra correta para ganhar moedas *UFSC*.\n\n🧩 Desafio: *${anagramaGame.embaralhada}*` });
+                break;
+
+            case 'desativa_anagrama':
+                if (!isSenderAdmin) return;
+                anagramaGame.ativo = false;
+                await sock.sendMessage(jid, { text: '🛑 O jogo de anagrama foi encerrado.' });
+                break;
+
+            case 'notificar':
+                if (!isSenderAdmin) return;
+                notificacoesAtivas[jid] = true;
+                await sock.sendMessage(jid, { text: '🔔 Notificações de entrada/solicitação: *ATIVADAS*' });
+                break;
+
+            case 'naonotificar':
+                if (!isSenderAdmin) return;
+                notificacoesAtivas[jid] = false;
+                await sock.sendMessage(jid, { text: '🔕 Notificações de entrada/solicitação: *DESATIVADAS*' });
+                break;
+
+            case 'aceitar':
+                if (!isSenderAdmin) return;
+                const userAcc = getMention();
+                if (!userAcc) return sock.sendMessage(jid, { text: '❌ Mencione o usuário que deseja aceitar!' });
+                try {
+                    await sock.groupParticipantsUpdate(jid, [userAcc], "add");
+                    await sock.sendMessage(jid, { text: `✅ @${userAcc.split('@')[0]} foi aceito no grupo!`, mentions: [userAcc] });
+                } catch (err) {
+                    await sock.sendMessage(jid, { text: '❌ Não foi possível adicionar. O usuário pode estar com privacidade ativa.' });
+                }
+                break;
+
+            case 'recusar':
+                if (!isSenderAdmin) return;
+                const userRec = getMention();
+                if (!userRec) return sock.sendMessage(jid, { text: '❌ Mencione o usuário que deseja recusar!' });
+                // Em solicitações pendentes, o "remove" serve para rejeitar
+                await sock.groupParticipantsUpdate(jid, [userRec], "remove");
+                await sock.sendMessage(jid, { text: `🚫 Solicitação de @${userRec.split('@')[0]} recusada.`, mentions: [userRec] });
                 break;
         }
     });
