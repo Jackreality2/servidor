@@ -476,6 +476,7 @@ async function startAtrinoBot() {
                     }
                 } catch (stkErr) {
                     console.error('Erro no comando de sticker:', stkErr);
+                    await sock.sendMessage(jid, { text: '❌ Erro ao criar figurinha. Suas moedas não foram descontadas.' });
                 }
                 break;
 
@@ -523,7 +524,7 @@ async function startAtrinoBot() {
                     }
                 } catch (err) {
                     console.error('Erro no comando .a:', err);
-                    await sock.sendMessage(jid, { text: '❌ Erro ao converter vídeo para figurinha.' });
+                    await sock.sendMessage(jid, { text: '❌ Erro ao converter vídeo para figurinha. Suas moedas não foram descontadas.' });
                 }
                 break;
 
@@ -540,25 +541,33 @@ async function startAtrinoBot() {
 
                     if (body.toLowerCase().includes('@eu')) {
                         t1 = sender;
-                        t2 = mentionsMatch[0];
+                        t2 = mentionsMatch.find(v => v !== sender) || mentionsMatch[0];
                     } else {
                         t1 = mentionsMatch[0];
                         t2 = mentionsMatch[1];
                     }
 
-                    if (!t1 || !t2) {
+                    if (!t1 || !t2 || t1 === t2) {
                         return sock.sendMessage(jid, { text: '❌ Erro! Use: .mat @eu @pessoa ou .mat @pessoa1 @pessoa2' }, { quoted: m });
                     }
 
                     await sock.sendMessage(jid, { text: '🏹 O cupido está analisando a conexão...' }, { quoted: m });
 
+                    const fallbackImg = 'https://ui-avatars.com/api/?name=User&background=random&size=250';
                     let p1, p2;
-                    try { p1 = await sock.profilePictureUrl(t1, 'image'); } catch { p1 = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png'; }
-                    try { p2 = await sock.profilePictureUrl(t2, 'image'); } catch { p2 = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png'; }
+                    try { p1 = await sock.profilePictureUrl(t1, 'image'); } catch { p1 = fallbackImg; }
+                    try { p2 = await sock.profilePictureUrl(t2, 'image'); } catch { p2 = fallbackImg; }
 
-                    const img1 = await Jimp.read(p1);
-                    const img2 = await Jimp.read(p2);
-                    const heart = await Jimp.read('https://i.imgur.com/8mS9Ym6.png'); // Ícone de coração PNG
+                    // Carrega as imagens em paralelo com tratamento de erro individual para evitar crash no Render
+                    const [img1, img2, heart] = await Promise.all([
+                        Jimp.read(p1).catch(() => Jimp.read(fallbackImg)),
+                        Jimp.read(p2).catch(() => Jimp.read(fallbackImg)),
+                        Jimp.read('https://i.imgur.com/8mS9Ym6.png').catch(async () => {
+                            // Se o Imgur falhar (comum no Render), cria um bloco vermelho como fallback
+                            const h = new Jimp(150, 150, 0xFF0000FF);
+                            return h;
+                        })
+                    ]);
 
                     img1.resize(250, 250);
                     img2.resize(250, 250);
@@ -584,7 +593,7 @@ async function startAtrinoBot() {
 
                 } catch (err) {
                     console.error('Erro no comando match:', err);
-                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o Match. Verifique se as fotos são acessíveis.' });
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o Match. Verifique se as fotos são acessíveis. (Suas moedas não foram descontadas)' });
                 }
                 break;
 
