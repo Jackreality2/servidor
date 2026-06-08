@@ -369,7 +369,7 @@ async function startAtrinoBot() {
 │ ➥ @name - Mencionar todos
 │
 ╰───────────────────╯`;
-                await sock.sendMessage(jid, { text: menu }, { quoted: m });
+                await sock.sendMessage(jid, { text: menu + logComando, mentions: [sender] }, { quoted: m });
                 break;
 
             case 'play':
@@ -396,7 +396,7 @@ async function startAtrinoBot() {
 
                     const arquivoTemporarioOgg = path.join('/tmp', `api_${Date.now()}.ogg`);
 
-                    await sock.sendMessage(jid, { text: `🎧 Processando: *${info.title}*` });
+                    await sock.sendMessage(jid, { text: `🎧 Processando: *${info.title}*${logComando}`, mentions: [sender] });
 
                     // Converte o stream do SoundCloud diretamente para OGG/Opus (formato nativo do WhatsApp)
                     await new Promise((resolve, reject) => {
@@ -432,14 +432,17 @@ async function startAtrinoBot() {
             case 's':
             case 'sticker':
                 try {
-                    // Verificação de Saldo (Custo Dinâmico)
-                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
-                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.\n\n🎮 Jogue o anagrama (.ativar_anagrama) para ganhar moedas!` }, { quoted: m });
-                    }
-
                     const quotedS = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
                     const imgS = m.message.imageMessage || quotedS?.imageMessage;
+
                     if (imgS) {
+                        // Apaga a mensagem imediatamente
+                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
+
+                        if ((saldosUFSC[sender] || 0) < precoFigurinha) {
+                            return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.${logComando}`, mentions: [sender] });
+                        }
+
                         const stream = await downloadContentFromMessage(imgS, 'image');
                         let buffer = Buffer.from([]);
                         for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
@@ -448,12 +451,8 @@ async function startAtrinoBot() {
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
-                        
-                        try {
-                            await sock.sendMessage(jid, { delete: m.key });
-                        } catch (delErr) {
-                            console.log('Erro ao deletar imagem (Verifique se o bot é Admin):', delErr.message);
-                        }
+                    } else {
+                        await sock.sendMessage(jid, { text: '❌ Envie uma foto ou responda a uma com .s' + logComando, mentions: [sender] });
                     }
                 } catch (stkErr) {
                     console.error('Erro no comando de sticker:', stkErr);
@@ -463,15 +462,17 @@ async function startAtrinoBot() {
             case 'a':
             case 'animada':
                 try {
-                    // Verificação de Saldo (Custo Dinâmico)
-                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
-                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha animada.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.` }, { quoted: m });
-                    }
-
                     const quotedA = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
                     const vidA = m.message.videoMessage || quotedA?.videoMessage;
                     
                     if (vidA) {
+                        // Apaga a mensagem imediatamente
+                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
+
+                        if ((saldosUFSC[sender] || 0) < precoFigurinha) {
+                            return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nVocê precisa de pelo menos *${precoFigurinha} UFSC* para criar uma figurinha animada.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.${logComando}`, mentions: [sender] });
+                        }
+
                         if (vidA.seconds > 10) return sock.sendMessage(jid, { text: '❌ O vídeo deve ter no máximo 10 segundos para virar figurinha!' }, { quoted: m });
 
                         const stream = await downloadContentFromMessage(vidA, 'video');
@@ -488,10 +489,8 @@ async function startAtrinoBot() {
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
-                        
-                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
                     } else {
-                        await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' }, { quoted: m });
+                        await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' + logComando, mentions: [sender] });
                     }
                 } catch (err) {
                     console.error('Erro no comando .a:', err);
@@ -504,15 +503,14 @@ async function startAtrinoBot() {
                 const userToAdmin = getMention();
                 if (!userToAdmin) return sock.sendMessage(jid, { text: '❌ Mencione alguém!' });
                 await sock.groupParticipantsUpdate(jid, [userToAdmin], "promote");
-                await sock.sendMessage(jid, { text: `✅ @${userToAdmin.split('@')[0]} agora é Admin!`, mentions: [userToAdmin] });
+                await sock.sendMessage(jid, { text: `✅ @${userToAdmin.split('@')[0]} agora é Admin!${logComando}`, mentions: [userToAdmin, sender] });
                 break;
 
             case 'relatorio':
                 if (!isSenderAdmin) return;
-                // Reação inicial com emoji de positivo
                 await sock.sendMessage(jid, { react: { text: '👍', key: m.key } });
 
-                let relTexto = "📋 *RELATÓRIO DE COMANDOS EXECUTADOS*\n\n";
+                let relTexto = "📋 *RELATÓRIO DE COMANDOS EXECUTADOS*\n";
                 if (historicoComandos.length === 0) {
                     relTexto += "_Nenhum comando registrado no histórico._";
                 } else {
@@ -520,17 +518,18 @@ async function startAtrinoBot() {
                         relTexto += `${i + 1}. .${h.comando} - @${h.usuario.split('@')[0]} : ${h.horario} : ${h.data}\n`;
                     });
                 }
+                relTexto += "\n_Caso o botão abaixo não apareça, digite .relpdf para baixar._";
 
                 const buttons = [
-                    { buttonId: '.relpdf', buttonText: { displayText: '📄 Transformar em PDF' }, type: 1 }
+                    { buttonId: '.relpdf', buttonText: { displayText: '📄 Baixar PDF' }, type: 1 }
                 ];
 
                 await sock.sendMessage(jid, { 
-                    text: relTexto, 
+                    text: relTexto + logComando, 
                     footer: 'Atrino Bot - Sistema de Auditoria',
                     buttons: buttons,
                     headerType: 1,
-                    mentions: historicoComandos.map(h => h.usuario)
+                    mentions: [sender, ...historicoComandos.map(h => h.usuario)]
                 });
                 break;
 
@@ -545,7 +544,8 @@ async function startAtrinoBot() {
                     document: Buffer.from(contentPdf), 
                     mimetype: 'application/pdf', 
                     fileName: 'relatorio_comandos.pdf',
-                    caption: '✅ Aqui está o seu relatório detalhado em PDF.'
+                    caption: '✅ Aqui está o seu relatório detalhado em PDF.' + logComando,
+                    mentions: [sender]
                 });
                 break;
 
@@ -553,13 +553,14 @@ async function startAtrinoBot() {
                 if (!isSenderAdmin || !getMention()) return;
                 const userMute = getMention();
                 if (!mutados.includes(userMute)) mutados.push(userMute);
-                await sock.sendMessage(jid, { text: `🤫 @${userMute.split('@')[0]} foi silenciado. Qualquer mensagem enviada agora resultará em advertência!`, mentions: [userMute] });
+                await sock.sendMessage(jid, { text: `🤫 @${userMute.split('@')[0]} foi silenciado. Qualquer mensagem enviada resultará em advertência!${logComando}`, mentions: [userMute, sender] });
                 break;
 
             case 'desmute':
                 if (!isSenderAdmin || !getMention()) return;
-                mutados = mutados.filter(x => x !== getMention());
-                await sock.sendMessage(jid, { text: '🔊 Liberado.', mentions: [getMention()] });
+                const userDesmute = getMention();
+                mutados = mutados.filter(x => x !== userDesmute);
+                await sock.sendMessage(jid, { text: `🔊 @${userDesmute.split('@')[0]} foi liberado.${logComando}`, mentions: [userDesmute, sender] });
                 break;
 
             case 'adv':
@@ -567,11 +568,11 @@ async function startAtrinoBot() {
                 const uAdv = getMention();
                 advertencias[uAdv] = (advertencias[uAdv] || 0) + 1;
                 if (advertencias[uAdv] >= 3) {
-                    await sock.sendMessage(jid, { text: `🚫 @${uAdv.split('@')[0]} atingiu 3/3 e foi removido.`, mentions: [uAdv] });
+                    await sock.sendMessage(jid, { text: `🚫 @${uAdv.split('@')[0]} atingiu 3/3 e foi removido.${logComando}`, mentions: [uAdv, sender] });
                     await sock.groupParticipantsUpdate(jid, [uAdv], "remove");
                     delete advertencias[uAdv];
                 } else {
-                    await sock.sendMessage(jid, { text: `⚠️ Adv ${advertencias[uAdv]}/3 para @${uAdv.split('@')[0]}`, mentions: [uAdv] });
+                    await sock.sendMessage(jid, { text: `⚠️ Adv ${advertencias[uAdv]}/3 para @${uAdv.split('@')[0]}${logComando}`, mentions: [uAdv, sender] });
                 }
                 break;
 
@@ -579,7 +580,7 @@ async function startAtrinoBot() {
                 if (!isSenderAdmin || !getMention()) return;
                 if (advertencias[getMention()]) {
                     advertencias[getMention()]--;
-                    await sock.sendMessage(jid, { text: `✅ Advertência removida.`, mentions: [getMention()] });
+                    await sock.sendMessage(jid, { text: `✅ Advertência removida.${logComando}`, mentions: [getMention(), sender] });
                 }
                 break;
 
@@ -589,19 +590,19 @@ async function startAtrinoBot() {
                 let textT = `📢 *AVISO GERAL*\n\n${args.join(' ') || 'Atenção!'}\n\n`;
                 let mnts = metadata.participants.map(p => p.id);
                 for (let mem of metadata.participants) textT += `➥ @${mem.id.split('@')[0]}\n`;
-                await sock.sendMessage(jid, { text: textT, mentions: mnts });
+                await sock.sendMessage(jid, { text: textT + logComando, mentions: [...mnts, sender] });
                 break;
 
             case 'abrir':
                 if (!isSenderAdmin) return;
                 await sock.groupSettingUpdate(jid, 'not_announcement');
-                await sock.sendMessage(jid, { text: '✅ *AGORA TODOS PODEM ENVIAR MENSAGEM*' });
+                await sock.sendMessage(jid, { text: `✅ *AGORA TODOS PODEM ENVIAR MENSAGEM*${logComando}`, mentions: [sender] });
                 break;
 
             case 'fechar':
                 if (!isSenderAdmin) return;
                 await sock.groupSettingUpdate(jid, 'announcement');
-                await sock.sendMessage(jid, { text: '❌ *AGORA APENAS ADMINISTRADORES PODEM ENVIAR MENSAGEM*' });
+                await sock.sendMessage(jid, { text: `❌ *AGORA APENAS ADMINISTRADORES PODEM ENVIAR MENSAGEM*${logComando}`, mentions: [sender] });
                 break;
 
             case 'ban':
@@ -612,8 +613,8 @@ async function startAtrinoBot() {
                 const motivoBan = args.join(' ').replace(/@\d+/g, '').trim() || "Sem motivo especificado";
                 
                 await sock.sendMessage(jid, { 
-                    text: `🚫 *USUÁRIO EXPULSO*\n\n👤 Usuário: @${userBan.split('@')[0]}\n📝 Motivo: ${motivoBan}\n\nO usuário foi removido do grupo.`, 
-                    mentions: [userBan] 
+                    text: `🚫 *USUÁRIO EXPULSO*\n\n👤 Usuário: @${userBan.split('@')[0]}\n📝 Motivo: ${motivoBan}\n\nO usuário foi removido.${logComando}`, 
+                    mentions: [userBan, sender] 
                 });
                 await sock.groupParticipantsUpdate(jid, [userBan], "remove");
                 break;
