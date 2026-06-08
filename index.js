@@ -133,20 +133,9 @@ async function startAtrinoBot() {
     // --- SISTEMA DE BOAS-VINDAS ---
     sock.ev.on('group-participants.update', async (anu) => {
         // Notificação de Solicitação de Entrada ou Novos Membros
-        if (notificacoesAtivas[anu.id]) {
-            if (anu.action === 'add') {
-                await sock.sendMessage(anu.id, { text: `📢 *Novo membro detectado:* @${anu.participants[0].split('@')[0]} entrou no salão.`, mentions: anu.participants });
-            } else if (anu.action === 'request') {
-                const solicitante = anu.participants[0];
-                const msgReq = `🔔 *SOLICITAÇÃO DE ENTRADA*\n\n` +
-                               `👤 Contato: @${solicitante.split('@')[0]}\n` +
-                               `🔢 Número: ${solicitante.split('@')[0]}\n\n` +
-                               `Use *.aceitar @user* ou *.recusar @user* para gerenciar.`;
-                await sock.sendMessage(anu.id, { text: msgReq, mentions: [solicitante] });
-            }
-        }
+        if (!notificacoesAtivas[anu.id]) return;
 
-        if (anu.action === 'add' && anu.id === ID_DO_GRUPO) {
+        if (anu.action === 'add') {
             for (const participant of anu.participants) {
                 let ppUrl;
                 try {
@@ -157,6 +146,13 @@ async function startAtrinoBot() {
                 const welcomeText = `╭─── [ ✨ *NOVO MEMBRO* ] ───╮\n│\n│  🌟 *Seja muito bem-vindo(a)!*\n│\n│  👤 @${participant.split('@')[0]}\n│  🏠 *Salão:* Atrino Bot\n│\n│  ➥ Leia as regras para evitar punições.\n│  ➥ Sinta-se em casa no nosso salão!\n╰─────────────────────╯`;
                 await sock.sendMessage(anu.id, { image: { url: ppUrl }, caption: welcomeText, mentions: [participant] });
             }
+        } else if (anu.action === 'request') {
+            const solicitante = anu.participants[0];
+            const msgReq = `🔔 *SOLICITAÇÃO DE ENTRADA*\n\n` +
+                           `👤 Contato: @${solicitante.split('@')[0]}\n` +
+                           `🔢 Número: ${solicitante.split('@')[0]}\n\n` +
+                           `Use *.aceitar @user* ou *.recusar @user* para gerenciar.`;
+            await sock.sendMessage(anu.id, { text: msgReq, mentions: [solicitante] });
         }
     });
 
@@ -594,10 +590,10 @@ async function startAtrinoBot() {
                 const userAcc = getMention();
                 if (!userAcc) return sock.sendMessage(jid, { text: '❌ Mencione o usuário que deseja aceitar!' });
                 try {
-                    await sock.groupParticipantsUpdate(jid, [userAcc], "add");
+                    await sock.groupRequestParticipantsUpdate(jid, [userAcc], "approve");
                     await sock.sendMessage(jid, { text: `✅ @${userAcc.split('@')[0]} foi aceito no grupo!`, mentions: [userAcc] });
                 } catch (err) {
-                    await sock.sendMessage(jid, { text: '❌ Não foi possível adicionar. O usuário pode estar com privacidade ativa.' });
+                    await sock.sendMessage(jid, { text: '❌ Erro ao aceitar. A solicitação pode ter expirado ou o bot não é admin.' });
                 }
                 break;
 
@@ -605,8 +601,7 @@ async function startAtrinoBot() {
                 if (!isSenderAdmin) return;
                 const userRec = getMention();
                 if (!userRec) return sock.sendMessage(jid, { text: '❌ Mencione o usuário que deseja recusar!' });
-                // Em solicitações pendentes, o "remove" serve para rejeitar
-                await sock.groupParticipantsUpdate(jid, [userRec], "remove");
+                await sock.groupRequestParticipantsUpdate(jid, [userRec], "reject");
                 await sock.sendMessage(jid, { text: `🚫 Solicitação de @${userRec.split('@')[0]} recusada.`, mentions: [userRec] });
                 break;
         }
