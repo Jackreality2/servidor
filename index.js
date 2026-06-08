@@ -255,8 +255,20 @@ async function startAtrinoBot() {
 
         if (mutados.includes(sender)) {
             try {
-                return await sock.sendMessage(jid, { delete: m.key });
-            } catch {
+                await sock.sendMessage(jid, { delete: m.key });
+                advertencias[sender] = (advertencias[sender] || 0) + 1;
+                
+                if (advertencias[sender] >= 3) {
+                    await sock.sendMessage(jid, { text: `🚫 @${sender.split('@')[0]} insistiu em enviar mensagens silenciado e atingiu 3/3 advertências. Removendo do grupo...`, mentions: [sender] });
+                    await sock.groupParticipantsUpdate(jid, [sender], "remove");
+                    mutados = mutados.filter(x => x !== sender);
+                    delete advertencias[sender];
+                } else {
+                    await sock.sendMessage(jid, { text: `⚠️ @${sender.split('@')[0]}, você está silenciado! Suas mensagens serão apagadas.\n*Advertência:* ${advertencias[sender]}/3`, mentions: [sender] });
+                }
+                return;
+            } catch (err) {
+                console.error("Erro ao processar mensagem de usuário mutado:", err);
                 return;
             }
         }
@@ -279,6 +291,12 @@ async function startAtrinoBot() {
 
         const args = body.slice(1).trim().split(/ +/);
         const command = args.shift().toLowerCase();
+
+        // --- LOG DE COMANDO PARA RESPOSTAS ---
+        const agoraCmd = new Date();
+        const horarioCmd = agoraCmd.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const dataCmd = agoraCmd.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const logComando = `\n\n*COMANDO SOLICITADO POR:* @${sender.split('@')[0]} : ${horarioCmd} : ${dataCmd}`;
 
         // --- SISTEMA DE COOLDOWN (10 SEGUNDOS) ---
         const agora = Date.now();
@@ -342,7 +360,7 @@ async function startAtrinoBot() {
 │ ➥ @name - Mencionar todos
 │
 ╰───────────────────╯`;
-                await sock.sendMessage(jid, { text: menu }, { quoted: m });
+                await sock.sendMessage(jid, { text: menu + logComando, mentions: [sender] }, { quoted: m });
                 break;
 
             case 'play':
@@ -482,8 +500,9 @@ async function startAtrinoBot() {
 
             case 'mute':
                 if (!isSenderAdmin || !getMention()) return;
-                if (!mutados.includes(getMention())) mutados.push(getMention());
-                await sock.sendMessage(jid, { text: '🤫 Silenciado.', mentions: [getMention()] });
+                const userMute = getMention();
+                if (!mutados.includes(userMute)) mutados.push(userMute);
+                await sock.sendMessage(jid, { text: `🤫 @${userMute.split('@')[0]} foi silenciado. Qualquer mensagem enviada agora resultará em advertência!`, mentions: [userMute] });
                 break;
 
             case 'desmute':
@@ -525,19 +544,27 @@ async function startAtrinoBot() {
             case 'abrir':
                 if (!isSenderAdmin) return;
                 await sock.groupSettingUpdate(jid, 'not_announcement');
-                const aberto = `╭─── [ 🔓 *SALÃO ABERTO* ] ───╮\n│\n│ 🌅 *As portas do salão se abrem.*\n│ ➥ O diálogo renasce sob o tempo marcado.\n│ ➥ Horário de despertar: 04:00h\n│\n╰─────────────────────╯`;
-                await sock.sendMessage(jid, { text: aberto });
+                await sock.sendMessage(jid, { text: '✅ *AGORA TODOS PODEM ENVIAR MENSAGEM*' });
                 break;
 
             case 'fechar':
                 if (!isSenderAdmin) return;
                 await sock.groupSettingUpdate(jid, 'announcement');
-                const fechado = `╭─── [ 🔒 *SALÃO ENCERRADO* ] ───╮\n│\n│ 🌑 *O silêncio retorna ao salão.*\n│ ➥ As vozes agora repousam sob o lunar.\n│ ➥ Horário de descanso: 00:00h\n│\n╰─────────────────────╯`;
-                await sock.sendMessage(jid, { text: fechado });
+                await sock.sendMessage(jid, { text: '❌ *AGORA APENAS ADMINISTRADORES PODEM ENVIAR MENSAGEM*' });
                 break;
 
             case 'ban':
-                if (isSenderAdmin && getMention()) await sock.groupParticipantsUpdate(jid, [getMention()], "remove");
+                if (!isSenderAdmin) return;
+                const userBan = getMention();
+                if (!userBan) return sock.sendMessage(jid, { text: '❌ Mencione o usuário que deseja banir!' });
+                
+                const motivoBan = args.join(' ').replace(/@\d+/g, '').trim() || "Sem motivo especificado";
+                
+                await sock.sendMessage(jid, { 
+                    text: `🚫 *USUÁRIO EXPULSO*\n\n👤 Usuário: @${userBan.split('@')[0]}\n📝 Motivo: ${motivoBan}\n\nO usuário foi removido do grupo.`, 
+                    mentions: [userBan] 
+                });
+                await sock.groupParticipantsUpdate(jid, [userBan], "remove");
                 break;
 
             case 'fixar':
