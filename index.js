@@ -132,10 +132,8 @@ async function startAtrinoBot() {
 
     // --- SISTEMA DE BOAS-VINDAS ---
     sock.ev.on('group-participants.update', async (anu) => {
-        // Notificação de Solicitação de Entrada ou Novos Membros
-        if (!notificacoesAtivas[anu.id]) return;
-
-        if (anu.action === 'add') {
+        // 1. Monitoramento de quem ENTRA (via link ou adicionado diretamente)
+        if (anu.action === 'add' && notificacoesAtivas[anu.id]) {
             for (const participant of anu.participants) {
                 let ppUrl;
                 try {
@@ -146,12 +144,18 @@ async function startAtrinoBot() {
                 const welcomeText = `╭─── [ ✨ *NOVO MEMBRO* ] ───╮\n│\n│  🌟 *Seja muito bem-vindo(a)!*\n│\n│  👤 @${participant.split('@')[0]}\n│  🏠 *Salão:* Atrino Bot\n│\n│  ➥ Leia as regras para evitar punições.\n│  ➥ Sinta-se em casa no nosso salão!\n╰─────────────────────╯`;
                 await sock.sendMessage(anu.id, { image: { url: ppUrl }, caption: welcomeText, mentions: [participant] });
             }
-        } else if (anu.action === 'request') {
+        } 
+        
+        // 2. Monitoramento de SOLICITAÇÕES (Aprovação de novos membros ativa)
+        // Notificamos sempre para garantir que o admin gerencie as entradas via link
+        if (anu.action === 'request') {
             const solicitante = anu.participants[0];
-            const msgReq = `🔔 *SOLICITAÇÃO DE ENTRADA*\n\n` +
-                           `👤 Contato: @${solicitante.split('@')[0]}\n` +
+            const msgReq = `🔔 *SOLICITAÇÃO DE ENTRADA VIA LINK*\n\n` +
+                           `👤 Usuário: @${solicitante.split('@')[0]}\n` +
                            `🔢 Número: ${solicitante.split('@')[0]}\n\n` +
-                           `Use *.aceitar @user* ou *.recusar @user* para gerenciar.`;
+                           `Alguém tentou entrar pelo link do grupo.\n` +
+                           `👉 Use *.aceitar @${solicitante.split('@')[0]}* para permitir.\n` +
+                           `👉 Use *.recusar @${solicitante.split('@')[0]}* para barrar.`;
             await sock.sendMessage(anu.id, { text: msgReq, mentions: [solicitante] });
         }
     });
