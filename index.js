@@ -36,6 +36,7 @@ let contagemAtiva = {};
 let saldosUFSC = {};
 let anagramaGame = { ativo: false, palavra: "", embaralhada: "", jid: "" };
 let notificacoesAtivas = {};
+let solicitacoesPendentes = {};
 
 // --- PALAVRAS PARA ANAGRAMA (Simulando IA) ---
 const listaPalavras = ["computador", "whatsapp", "javascript", "teclado", "celular", "inteligencia", "programador", "saturno", "banana", "guitarra", "futebol", "universo"];
@@ -150,12 +151,13 @@ async function startAtrinoBot() {
         // Notificamos sempre para garantir que o admin gerencie as entradas via link
         if (anu.action === 'request') {
             const solicitante = anu.participants[0];
+            solicitacoesPendentes[anu.id] = solicitante; // Armazena a última solicitação do grupo
             const msgReq = `🔔 *SOLICITAÇÃO DE ENTRADA VIA LINK*\n\n` +
                            `👤 Usuário: @${solicitante.split('@')[0]}\n` +
                            `🔢 Número: ${solicitante.split('@')[0]}\n\n` +
                            `Alguém tentou entrar pelo link do grupo.\n` +
-                           `👉 Use *.aceitar @${solicitante.split('@')[0]}* para permitir.\n` +
-                           `👉 Use *.recusar @${solicitante.split('@')[0]}* para barrar.`;
+                           `👉 Digite apenas *.aceitar* para permitir.\n` +
+                           `👉 Digite apenas *.recusar* para barrar.`;
             await sock.sendMessage(anu.id, { text: msgReq, mentions: [solicitante] });
         }
     });
@@ -591,22 +593,24 @@ async function startAtrinoBot() {
 
             case 'aceitar':
                 if (!isSenderAdmin) return;
-                const userAcc = getMention();
-                if (!userAcc) return sock.sendMessage(jid, { text: '❌ Mencione o usuário que deseja aceitar!' });
+                const userAcc = getMention() || solicitacoesPendentes[jid];
+                if (!userAcc) return sock.sendMessage(jid, { text: '❌ Não encontrei nenhuma solicitação recente para aceitar.' });
                 try {
                     await sock.groupRequestParticipantsUpdate(jid, [userAcc], "approve");
-                    await sock.sendMessage(jid, { text: `✅ @${userAcc.split('@')[0]} foi aceito no grupo!`, mentions: [userAcc] });
+                    await sock.sendMessage(jid, { text: `✅ A solicitação de @${userAcc.split('@')[0]} foi aprovada com sucesso!`, mentions: [userAcc] });
+                    delete solicitacoesPendentes[jid]; // Limpa após processar
                 } catch (err) {
-                    await sock.sendMessage(jid, { text: '❌ Erro ao aceitar. A solicitação pode ter expirado ou o bot não é admin.' });
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar: a solicitação pode ter expirado ou o usuário cancelou.' });
                 }
                 break;
 
             case 'recusar':
                 if (!isSenderAdmin) return;
-                const userRec = getMention();
-                if (!userRec) return sock.sendMessage(jid, { text: '❌ Mencione o usuário que deseja recusar!' });
+                const userRec = getMention() || solicitacoesPendentes[jid];
+                if (!userRec) return sock.sendMessage(jid, { text: '❌ Não encontrei nenhuma solicitação recente para recusar.' });
                 await sock.groupRequestParticipantsUpdate(jid, [userRec], "reject");
-                await sock.sendMessage(jid, { text: `🚫 Solicitação de @${userRec.split('@')[0]} recusada.`, mentions: [userRec] });
+                await sock.sendMessage(jid, { text: `🚫 A solicitação de @${userRec.split('@')[0]} foi recusada.`, mentions: [userRec] });
+                delete solicitacoesPendentes[jid]; // Limpa após processar
                 break;
         }
     });
