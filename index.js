@@ -7,6 +7,7 @@ const cron = require('node-cron');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const Jimp = require('jimp');
 
 // --- CORREÇÃO DEFINITIVA DO FFMPEG PARA O RENDER ---
 const ffmpegPath = require('ffmpeg-static');
@@ -347,6 +348,7 @@ async function startAtrinoBot() {
 │ 🧑‍🤝‍🧑 *Membros:*
 │ ➥ .s - Figurinha (Foto)
 │ ➥ .a - Figurinha Animada (Vídeo)
+│ ➥ .mat @user - Calcular Match
 │
 │ 👮 *Admin:*
 │ ➥ .play [nome] - Tocar música
@@ -522,6 +524,67 @@ async function startAtrinoBot() {
                 } catch (err) {
                     console.error('Erro no comando .a:', err);
                     await sock.sendMessage(jid, { text: '❌ Erro ao converter vídeo para figurinha.' });
+                }
+                break;
+
+            case 'mat':
+            case 'match':
+                try {
+                    // Verificação de Saldo (Custo Dinâmico igual figurinha)
+                    if ((saldosUFSC[sender] || 0) < precoFigurinha) {
+                        return sock.sendMessage(jid, { text: `❌ *SALDO INSUFICIENTE*\n\nO custo do Match é *${precoFigurinha} UFSC*.\n💰 Seu saldo atual: ${saldosUFSC[sender] || 0} UFSC.` }, { quoted: m });
+                    }
+
+                    let t1, t2;
+                    const mentionsMatch = m.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
+                    if (body.toLowerCase().includes('@eu')) {
+                        t1 = sender;
+                        t2 = mentionsMatch[0];
+                    } else {
+                        t1 = mentionsMatch[0];
+                        t2 = mentionsMatch[1];
+                    }
+
+                    if (!t1 || !t2) {
+                        return sock.sendMessage(jid, { text: '❌ Erro! Use: .mat @eu @pessoa ou .mat @pessoa1 @pessoa2' }, { quoted: m });
+                    }
+
+                    await sock.sendMessage(jid, { text: '🏹 O cupido está analisando a conexão...' }, { quoted: m });
+
+                    let p1, p2;
+                    try { p1 = await sock.profilePictureUrl(t1, 'image'); } catch { p1 = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png'; }
+                    try { p2 = await sock.profilePictureUrl(t2, 'image'); } catch { p2 = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png'; }
+
+                    const img1 = await Jimp.read(p1);
+                    const img2 = await Jimp.read(p2);
+                    const heart = await Jimp.read('https://i.imgur.com/8mS9Ym6.png'); // Ícone de coração PNG
+
+                    img1.resize(250, 250);
+                    img2.resize(250, 250);
+                    heart.resize(150, 150);
+
+                    const canvas = new Jimp(650, 250, 0x00000000); // Fundo transparente
+                    canvas.composite(img1, 0, 0);
+                    canvas.composite(heart, 250, 50);
+                    canvas.composite(img2, 400, 0);
+
+                    const buffer = await canvas.getBufferAsync(Jimp.MIME_PNG);
+                    const lovePerc = Math.floor(Math.random() * 101);
+                    
+                    let fraseAmor = lovePerc > 80 ? "🔥 UM CASAL EXPLOSIVO!" : lovePerc > 50 ? "💖 Tem futuro, hein!" : "📉 Melhor ficarem só na amizade.";
+
+                    await sock.sendMessage(jid, { 
+                        image: buffer, 
+                        caption: `💘 *MATCH DETECTADO* 💘\n\n👤 @${t1.split('@')[0]}\n👤 @${t2.split('@')[0]}\n\n✨ Afinidade: *${lovePerc}%*\n📝 ${fraseAmor}\n\n💰 Custo: ${precoFigurinha} UFSC`,
+                        mentions: [t1, t2]
+                    }, { quoted: m });
+
+                    saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
+
+                } catch (err) {
+                    console.error('Erro no comando match:', err);
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar o Match. Verifique se as fotos são acessíveis.' });
                 }
                 break;
 
