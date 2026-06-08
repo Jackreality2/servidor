@@ -32,6 +32,7 @@ let botSilenciado = false;
 let cooldowns = {};
 let qrAtual = null; // 🚀 Armazena o QR Code ativo para renderizar na Web do Render
 let estatisticas = {};
+let contagemAtiva = {};
 
 // --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
 const PORT = parseInt(process.env.PORT, 10) || 7860;
@@ -182,16 +183,18 @@ async function startAtrinoBot() {
         const sender = m.key.participant || m.key.remoteJid;
 
         // --- SISTEMA DE CONTAGEM DE ATIVIDADE ---
-        if (!estatisticas[jid]) estatisticas[jid] = {};
-        if (!estatisticas[jid][sender]) {
-            estatisticas[jid][sender] = { mensagens: 0, fotos: 0, videos: 0, figurinhas: 0, total: 0 };
+        if (contagemAtiva[jid]) {
+            if (!estatisticas[jid]) estatisticas[jid] = {};
+            if (!estatisticas[jid][sender]) {
+                estatisticas[jid][sender] = { mensagens: 0, fotos: 0, videos: 0, figurinhas: 0, total: 0 };
+            }
+            const userActivity = estatisticas[jid][sender];
+            userActivity.total++;
+            if (m.message.conversation || m.message.extendedTextMessage) userActivity.mensagens++;
+            else if (m.message.imageMessage) userActivity.fotos++;
+            else if (m.message.videoMessage) userActivity.videos++;
+            else if (m.message.stickerMessage) userActivity.figurinhas++;
         }
-        const userActivity = estatisticas[jid][sender];
-        userActivity.total++;
-        if (m.message.conversation || m.message.extendedTextMessage) userActivity.mensagens++;
-        else if (m.message.imageMessage) userActivity.fotos++;
-        else if (m.message.videoMessage) userActivity.videos++;
-        else if (m.message.stickerMessage) userActivity.figurinhas++;
         
         if (mutados.includes(sender)) {
             try {
@@ -248,11 +251,11 @@ async function startAtrinoBot() {
 │
 │ 🧑‍🤝‍🧑 *Membros:*
 │ ➥ .s - Figurinha (Foto)
-│ ➥ .contado - Ver minhas estatísticas
-│ ➥ .id - Ver ID do grupo
 │
 │ 👮 *Admin:*
 │ ➥ .play [nome] - Tocar música
+│ ➥ .contador - Ativar/Desativar contagem
+│ ➥ .id - Ver ID do grupo
 │ ➥ .ranking - Lista de mais ativos
 │ ➥ .tornaadm @user - Dar Admin
 │ ➥ .totag - Marcar o grupo
@@ -451,22 +454,18 @@ async function startAtrinoBot() {
                 break;
 
             case 'id':
+                if (!isSenderAdmin) return sock.sendMessage(jid, { text: '❌ Comando restrito a administradores!' }, { quoted: m });
                 await sock.sendMessage(jid, { text: `🆔 *ID deste grupo:* ${jid}` }, { quoted: m });
                 break;
 
+            case 'contador':
             case 'contado':
-                const sStats = estatisticas[jid]?.[sender];
-                if (!sStats) return sock.sendMessage(jid, { text: '❌ Você ainda não possui registros de atividade neste grupo.' }, { quoted: m });
+                if (!isSenderAdmin) return sock.sendMessage(jid, { text: '❌ Comando restrito a administradores!' }, { quoted: m });
                 
-                let personalStats = `📊 *SUAS ESTATÍSTICAS*\n\n`;
-                personalStats += `👤 @${sender.split('@')[0]}\n`;
-                personalStats += `💬 Mensagens: ${sStats.mensagens}\n`;
-                personalStats += `🖼️ Fotos: ${sStats.fotos}\n`;
-                personalStats += `📹 Vídeos: ${sStats.videos}\n`;
-                personalStats += `🗿 Figurinhas: ${sStats.figurinhas}\n`;
-                personalStats += `📈 Total de interações: ${sStats.total}`;
+                contagemAtiva[jid] = !contagemAtiva[jid];
+                const statusTxt = contagemAtiva[jid] ? '✅ *ATIVADA*' : '❌ *DESATIVADA*';
                 
-                await sock.sendMessage(jid, { text: personalStats, mentions: [sender] }, { quoted: m });
+                await sock.sendMessage(jid, { text: `📊 A contagem de estatísticas foi ${statusTxt} neste grupo.\n\nUse *.ranking* para ver os resultados.` }, { quoted: m });
                 break;
 
             case 'ranking':
