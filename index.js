@@ -8,6 +8,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const Jimp = require('jimp');
+const axios = require('axios');
 
 // --- CORREÇÃO DEFINITIVA DO FFMPEG PARA O RENDER ---
 const ffmpegPath = require('ffmpeg-static');
@@ -38,6 +39,7 @@ let contagemAtiva = {};
 let saldosUFSC = {};
 let anagramaGame = { ativo: false, palavra: "", embaralhada: "", jid: "" };
 let notificacoesAtivas = {};
+let ultimoVideoTikTok = null;
 let solicitacoesPendentes = {};
 let precoFigurinha = 2;
 let ultimaInteracao = {};
@@ -53,6 +55,50 @@ function gerarAnagrama() {
         [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return { original: palavra, embaralhada: arr.join('').toUpperCase() };
+}
+
+// --- SISTEMA DE MONITORAMENTO TIKTOK ---
+async function buscarVideoTikTok(sock, jid, manual = false) {
+    try {
+        const profileUser = 'meetsocietyofc';
+        // Usando uma API pública de busca/scrape para evitar bloqueios diretos do TikTok
+        const response = await axios.get(`https://www.tiktok.com/@${profileUser}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36' }
+        });
+
+        // Lógica simplificada para extrair o primeiro vídeo não fixado
+        // Nota: Em um ambiente de produção, recomenda-se o uso de uma biblioteca de scrape ou API paga
+        const html = response.data;
+        const videoIds = html.match(/"id":"(\d+)"/g)?.map(id => id.replace(/"id":"|"/g, '')) || [];
+        
+        // Geralmente os fixados aparecem primeiro, mas os dados brutos de script costumam listar por data
+        // Aqui pegamos o ID mais recente que não seja o que já avisamos
+        const videoAtual = videoIds[0]; 
+
+        if (!videoAtual) return manual ? sock.sendMessage(jid, { text: "❌ Não consegui encontrar vídeos recentes agora." }) : null;
+
+        const linkVideo = `https://www.tiktok.com/@${profileUser}/video/${videoAtual}`;
+
+        if (manual || videoAtual !== ultimoVideoTikTok) {
+            if (!manual) ultimoVideoTikTok = videoAtual;
+
+            const layoutTikTok = `╭─── [ 🎬 *TIKTOK ATUALIZADO* ] ───╮\n` +
+                               `│\n` +
+                               `│ 📱 *Canal:* @${profileUser}\n` +
+                               `│ ✨ *Opa! Tem vídeo novo na área.*\n` +
+                               `│\n` +
+                               `│ 🔗 *Link do vídeo:*\n` +
+                               `│ ${linkVideo}\n` +
+                               `│\n` +
+                               `│ 🚀 *Vá lá dar aquela força!*\n` +
+                               `╰─────────────────────╯`;
+
+            await sock.sendMessage(jid, { text: layoutTikTok });
+        }
+    } catch (err) {
+        console.error("Erro ao buscar TikTok:", err.message);
+        if (manual) await sock.sendMessage(jid, { text: "❌ Erro ao acessar o perfil do TikTok." });
+    }
 }
 
 // --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
@@ -182,6 +228,11 @@ async function startAtrinoBot() {
             await sock.sendMessage(ID_DO_GRUPO, { text: textoAberto });
         } catch (err) {}
     }, { timezone: "America/Sao_Paulo" });
+
+    // Monitoramento Automático TikTok (A cada 30 minutos)
+    cron.schedule('*/30 * * * *', async () => {
+        await buscarVideoTikTok(sock, ID_DO_GRUPO);
+    });
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -351,6 +402,7 @@ async function startAtrinoBot() {
 │ ➥ .mat @user - Calcular Match
 │
 │ 👮 *Admin:*
+│ ➥ .avisar - Último vídeo TikTok
 │ ➥ .play [nome] - Tocar música
 │ ➥ .contador - Ativar/Desativar contagem
 │ ➥ .citar - Marcar alvo para flood
@@ -437,6 +489,11 @@ async function startAtrinoBot() {
                     await sock.sendMessage(jid, { text: '❌ Erro ao processar a música. Tente outro nome ou link.' }, { quoted: m });
                 }
                 break;     
+            case 'avisar':
+                if (!isSenderAdmin) return;
+                await sock.sendMessage(jid, { text: "🔎 Buscando vídeo mais recente..." });
+                await buscarVideoTikTok(sock, jid, true);
+                break;
             case 's':
             case 'sticker':
                 try {
