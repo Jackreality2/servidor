@@ -18,8 +18,8 @@ const fluentFfmpeg = require('fluent-ffmpeg');
 fluentFfmpeg.setFfmpegPath(ffmpegPath);
 
 // --- INTEGRAÇÃO DO SOUNDCLOUD ---
-const SoundCloud = require("soundcloud-scraper");
-const client = new SoundCloud.Client();
+// const SoundCloud = require("soundcloud-scraper"); // Não é mais necessário
+// const client = new SoundCloud.Client(); // Não é mais necessário
 
 const logger = P({ level: 'silent' });
 
@@ -454,22 +454,28 @@ async function startAtrinoBot() {
 
                     await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}"...` }, { quoted: m });
 
-                    // 1. Busca e obtém o link de download em uma API pública e estável
-                    // Esta API já faz a busca no YouTube e retorna o link direto do áudio (MP3)
-                    const apiRes = await axios.get(`https://api.dhamax.com/youtube/play?query=${encodeURIComponent(busca)}`);
+                    // 1. Busca vídeos no TikTok usando a API akuari.my.id
+                    const apiRes = await axios.get(`https://api.akuari.my.id/downloader/tiktoksearch?query=${encodeURIComponent(busca)}`);
                     
-                    if (!apiRes.data || apiRes.data.status !== 200 || !apiRes.data.result) {
-                        return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome.' }, { quoted: m });
+                    if (!apiRes.data || !apiRes.data.result || apiRes.data.result.length === 0) {
+                        return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada no TikTok com esse nome.' }, { quoted: m });
                     }
 
-                    const music = apiRes.data.result;
-                    const downloadUrl = music.audio; // URL direta do arquivo MP3 retornada pela API
+                    const firstVideo = apiRes.data.result[0];
+                    const musicTitle = firstVideo.music_info?.title || "Música do TikTok";
+                    const downloadUrl = firstVideo.music_info?.play_url; // URL direta do áudio da música do TikTok
 
+                    // Verifica se a URL de download foi encontrada
                     tempInputAudioPath = path.join('/tmp', `input_${Date.now()}.mp3`);
                     arquivoTemporarioOgg = path.join('/tmp', `output_${Date.now()}.ogg`);
 
-                    await sock.sendMessage(jid, { text: `🎧 Processando: *${music.title}*` });
+                    if (!downloadUrl) {
+                        return await sock.sendMessage(jid, { text: `❌ Não foi possível obter o link de áudio para "${musicTitle}".` }, { quoted: m });
+                    }
 
+                    await sock.sendMessage(jid, { text: `🎧 Processando: *${musicTitle}*` });
+
+                    // 2. Faz o download do áudio da URL obtida
                     const resStream = await axios({
                         method: 'get',
                         url: downloadUrl,
