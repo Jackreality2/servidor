@@ -412,13 +412,6 @@ async function startAtrinoBot() {
 │ ➥ .avisar - Último vídeo TikTok
 │ ➥ .play [nome] - Tocar música
 │ ➥ .cep [cep] - Consulta CEP
-│ ➥ .cnpj [cnpj] - Consulta CNPJ
-│ ➥ .ddd [ddd] - Consulta DDD
-│ ➥ .banco [codigo] - Info Banco
-│ ➥ .feriados [ano] - Feriados
-│ ➥ .clima [cidade] - Clima Atual
-│ ➥ .cpf [cpf] - Consulta CPF
-│ ➥ .nomecompleto [nome] - Consulta Nome
 │ ➥ .contador - Ativar/Desativar contagem
 │ ➥ .citar - Marcar alvo para flood
 │ ➥ .doar @user [valor] - Dar moedas
@@ -546,90 +539,17 @@ async function startAtrinoBot() {
                 if (!isSenderAdmin) return;
                 if (!args[0]) return sock.sendMessage(jid, { text: '❌ Informe o CEP!' });
                 try {
-                    const cepRes = await axios.get(`https://brasilapi.com.br/api/cep/v1/${args[0].replace(/\D/g, '')}`);
-                    const data = cepRes.data;
+                    const cepRes = await axios.get(`https://viacep.com.br/ws/${args[0].replace(/\D/g, '')}/json/`);
+                    if (cepRes.data.erro) return sock.sendMessage(jid, { text: '❌ CEP não encontrado.' });
                     const infoCep = `📍 *INFORMAÇÕES DO CEP*\n\n` +
-                                    `📮 *CEP:* ${data.cep}\n` +
-                                    `🏘️ *Logradouro:* ${data.street}\n` +
-                                    `🏢 *Bairro:* ${data.neighborhood}\n` +
-                                    `🏙️ *Cidade:* ${data.city}\n` +
-                                    `🗺️ *Estado:* ${data.state}`;
+                                    `📮 *CEP:* ${cepRes.data.cep}\n` +
+                                    `🏘️ *Logradouro:* ${cepRes.data.logradouro}\n` +
+                                    `🏢 *Bairro:* ${cepRes.data.bairro}\n` +
+                                    `🏙️ *Cidade:* ${cepRes.data.localidade}\n` +
+                                    `🗺️ *Estado:* ${cepRes.data.uf}`;
                     await sock.sendMessage(jid, { text: infoCep + logComando });
                 } catch (e) {
                     await sock.sendMessage(jid, { text: '❌ Erro ao buscar CEP.' });
-                }
-                break;
-
-            case 'cnpj':
-                if (!isSenderAdmin) return;
-                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Informe o CNPJ!' });
-                try {
-                    const cnpjRes = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${args[0].replace(/\D/g, '')}`);
-                    const d = cnpjRes.data;
-                    const infoCnpj = `🏢 *CONSULTA CNPJ*\n\n` +
-                                     `📌 *Razão Social:* ${d.razao_social}\n` +
-                                     `🏷️ *Nome Fantasia:* ${d.nome_fantasia || 'N/A'}\n` +
-                                     `🔢 *CNPJ:* ${d.cnpj}\n` +
-                                     `📅 *Abertura:* ${d.data_inicio_atividade}\n` +
-                                     `📍 *Local:* ${d.municipio} - ${d.uf}\n` +
-                                     `📞 *Telefone:* ${d.ddd_telefone_1}`;
-                    await sock.sendMessage(jid, { text: infoCnpj + logComando });
-                } catch (e) {
-                    await sock.sendMessage(jid, { text: '❌ CNPJ não encontrado ou erro na API.' });
-                }
-                break;
-
-            case 'ddd':
-                if (!isSenderAdmin) return;
-                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Informe o DDD!' });
-                try {
-                    const dddRes = await axios.get(`https://brasilapi.com.br/api/ddd/v1/${args[0]}`);
-                    const infoDdd = `📞 *DDD ${args[0]}*\n\n` +
-                                    `🗺️ *Estado:* ${dddRes.data.state}\n` +
-                                    `🏙️ *Cidades:* ${dddRes.data.cities.slice(0, 10).join(', ')}...`;
-                    await sock.sendMessage(jid, { text: infoDdd + logComando });
-                } catch (e) {
-                    await sock.sendMessage(jid, { text: '❌ DDD inválido.' });
-                }
-                break;
-
-            case 'banco':
-                if (!isSenderAdmin) return;
-                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Informe o código do banco!' });
-                try {
-                    const bankRes = await axios.get(`https://brasilapi.com.br/api/banks/v1/${args[0]}`);
-                    const b = bankRes.data;
-                    const infoBank = `🏦 *DADOS BANCÁRIOS*\n\n` +
-                                     `🏛️ *Nome:* ${b.fullName}\n` +
-                                     `🆔 *ISPB:* ${b.ispb}\n` +
-                                     `🔢 *Código:* ${b.code || 'N/A'}`;
-                    await sock.sendMessage(jid, { text: infoBank + logComando });
-                } catch (e) {
-                    await sock.sendMessage(jid, { text: '❌ Banco não encontrado.' });
-                }
-                break;
-
-            case 'feriados':
-                if (!isSenderAdmin) return;
-                const ano = args[0] || new Date().getFullYear();
-                try {
-                    const ferRes = await axios.get(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
-                    const lista = ferRes.data.slice(0, 10).map(f => `📅 ${f.date}: ${f.name}`).join('\n');
-                    await sock.sendMessage(jid, { text: `🗓️ *FERIADOS ${ano}*\n\n${lista}` + logComando });
-                } catch (e) {
-                    await sock.sendMessage(jid, { text: '❌ Erro ao buscar feriados.' });
-                }
-                break;
-
-            case 'clima':
-                if (!isSenderAdmin) return;
-                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Informe a cidade!' });
-                try {
-                    const city = encodeURIComponent(args.join(' '));
-                    const res = await axios.get(`https://pt.wttr.in/${city}?format=%C+%t+%w`);
-                    await sock.sendMessage(jid, { text: `☁️ *CLIMA ATUAL*\n\n📍 *Cidade:* ${args.join(' ')}\n🌡️ *Condições:* ${res.data}` + logComando });
-                } catch (e) {
-                    await sock.sendMessage(jid, { text: '❌ Erro ao buscar clima.' });
                 }
                 break;
 
