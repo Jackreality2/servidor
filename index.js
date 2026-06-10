@@ -452,19 +452,19 @@ async function startAtrinoBot() {
                     const busca = args.join(' ');
                     if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link! Exemplo: .play Nome da Musica' }, { quoted: m });
 
-                    await sock.sendMessage(jid, { text: `🎵 Buscando a versão completa de "${busca}" no YouTube...` }, { quoted: m });
+                    await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}" no TikTok...` }, { quoted: m });
 
-                    // 1. Busca e obtém o link da música completa via API de YouTube (Vreden)
-                    // TikTok geralmente entrega apenas 30s de prévia; o YouTube entrega a música toda.
-                    const apiRes = await axios.get(`https://api.vreden.my.id/api/ytplay?query=${encodeURIComponent(busca)}`);
+                    // 1. Busca vídeos no TikTok usando a API TikWM
+                    // Esta API geralmente retorna prévias de 30 segundos.
+                    const apiRes = await axios.get(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(busca)}`);
                     
-                    if (!apiRes.data || !apiRes.data.status || !apiRes.data.result) {
-                        return await sock.sendMessage(jid, { text: '❌ Nenhuma música completa encontrada para este nome.' }, { quoted: m });
+                    if (!apiRes.data || apiRes.data.code !== 0 || !apiRes.data.data.videos || apiRes.data.data.videos.length === 0) {
+                        return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada no TikTok com esse nome.' }, { quoted: m });
                     }
 
-                    const music = apiRes.data.result;
-                    const musicTitle = music.title || "Música";
-                    const downloadUrl = music.download?.url; // URL do áudio completo (.mp3)
+                    const firstVideo = apiRes.data.data.videos[0];
+                    const musicTitle = firstVideo.music_info?.title || firstVideo.title || "Música do TikTok";
+                    const downloadUrl = firstVideo.music; // URL direta do áudio (.mp3) fornecida pela TikWM
 
                     // Verifica se a URL de download foi encontrada
                     tempInputAudioPath = path.join('/tmp', `input_${Date.now()}.mp3`);
