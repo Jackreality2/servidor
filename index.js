@@ -454,24 +454,22 @@ async function startAtrinoBot() {
 
                     await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}"...` }, { quoted: m });
 
-                    // 1. Busca a música na sua nova API
-                    const response = await axios.get(`https://apimusic.thryl.com.br/search?q=${encodeURIComponent(busca)}`);
-                    const musicas = response.data;
-
-                    if (!musicas || musicas.length === 0) {
+                    // 1. Busca e obtém o link de download em uma API pública e estável
+                    // Esta API já faz a busca no YouTube e retorna o link direto do áudio (MP3)
+                    const apiRes = await axios.get(`https://api.dhamax.com/youtube/play?query=${encodeURIComponent(busca)}`);
+                    
+                    if (!apiRes.data || apiRes.data.status !== 200 || !apiRes.data.result) {
                         return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome.' }, { quoted: m });
                     }
 
-                    const music = musicas[0];
+                    const music = apiRes.data.result;
+                    const downloadUrl = music.audio; // URL direta do arquivo MP3 retornada pela API
+
                     tempInputAudioPath = path.join('/tmp', `input_${Date.now()}.mp3`);
                     arquivoTemporarioOgg = path.join('/tmp', `output_${Date.now()}.ogg`);
 
-                    await sock.sendMessage(jid, { text: `🎧 Baixando: *${music.title}* de *${music.author}*` });
+                    await sock.sendMessage(jid, { text: `🎧 Processando: *${music.title}*` });
 
-                    // 2. Faz o download do áudio usando o ID retornado pela API
-                    // Nota: Assumi que o endpoint de download segue o padrão da API (/download?id=)
-                    const downloadUrl = `https://apimusic.thryl.com.br/download?id=${music.id}`;
-                    console.log(`Attempting to download from: ${downloadUrl}`); // Log the download URL
                     const resStream = await axios({
                         method: 'get',
                         url: downloadUrl,
