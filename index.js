@@ -454,16 +454,16 @@ async function startAtrinoBot() {
 
                     await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}"...` }, { quoted: m });
 
-                    // 1. Busca vídeos no TikTok usando a API akuari.my.id
-                    const apiRes = await axios.get(`https://api.akuari.my.id/downloader/tiktoksearch?query=${encodeURIComponent(busca)}`);
+                    // 1. Busca vídeos no TikTok usando a API TikWM (Mais estável que a anterior)
+                    const apiRes = await axios.get(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(busca)}`);
                     
-                    if (!apiRes.data || !apiRes.data.result || apiRes.data.result.length === 0) {
+                    if (!apiRes.data || apiRes.data.code !== 0 || !apiRes.data.data.videos || apiRes.data.data.videos.length === 0) {
                         return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada no TikTok com esse nome.' }, { quoted: m });
                     }
 
-                    const firstVideo = apiRes.data.result[0];
-                    const musicTitle = firstVideo.music_info?.title || "Música do TikTok";
-                    const downloadUrl = firstVideo.music_info?.play_url; // URL direta do áudio da música do TikTok
+                    const firstVideo = apiRes.data.data.videos[0];
+                    const musicTitle = firstVideo.music_info?.title || firstVideo.title || "Música do TikTok";
+                    const downloadUrl = firstVideo.music; // URL direta do áudio (.mp3) fornecida pela TikWM
 
                     // Verifica se a URL de download foi encontrada
                     tempInputAudioPath = path.join('/tmp', `input_${Date.now()}.mp3`);
