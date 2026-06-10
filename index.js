@@ -566,6 +566,7 @@ async function startAtrinoBot() {
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
+                        await sock.sendMessage(jid, { text: `✅ Figurinha criada! 💰 Seu saldo atual: *${saldosUFSC[sender]} UFSC*` }, { quoted: m });
                     } else {
                         await sock.sendMessage(jid, { text: '❌ Envie uma foto ou responda a uma com .s' + logComando, mentions: [sender] });
                         
@@ -617,6 +618,7 @@ async function startAtrinoBot() {
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
+                        await sock.sendMessage(jid, { text: `✅ Figurinha animada criada! 💰 Seu saldo atual: *${saldosUFSC[sender]} UFSC*` }, { quoted: m });
                         
                         try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
                     } else {
@@ -661,6 +663,7 @@ async function startAtrinoBot() {
                                     lovePerc > 40 ? "⚖️ Tem chance, mas precisam sair do zero a zero." : 
                                     "📉 A vibe não bateu... Melhor ficarem na amizade.";
 
+                    saldosUFSC[sender] -= precoFigurinha; // Deduz o custo antes de mostrar o layout
                     const layoutMatch = `✨ 💘 *ORÁCULO DO AMOR* 💘 ✨\n` +
                                       `━━━━━━━━━━━━━━━━━\n\n` +
                                       `👤 @${t1.split('@')[0]}\n` +
@@ -669,6 +672,7 @@ async function startAtrinoBot() {
                                       `📝 *Veredito:* ${fraseAmor}\n\n` +
                                       `━━━━━━━━━━━━━━━━━\n` +
                                       `💰 *Custo:* ${precoFigurinha} UFSC`;
+                                      `💰 *Saldo atual:* ${saldosUFSC[sender]} UFSC`;
 
                     await sock.sendMessage(jid, { 
                         text: layoutMatch,
