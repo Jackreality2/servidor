@@ -442,6 +442,8 @@ async function startAtrinoBot() {
             case 'play':
             case 'yt':
             case 'youtube':
+                let tempInputAudioPath = null;
+                let arquivoTemporarioOgg = null;
                 try {
                     if (!isSenderAdmin) {
                         return await sock.sendMessage(jid, { text: '❌ Apenas administradores podem usar o comando de música!' }, { quoted: m });
@@ -452,48 +454,66 @@ async function startAtrinoBot() {
 
                     await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}"...` }, { quoted: m });
 
-                    // Busca a música no SoundCloud (já configurado no seu código)
-                    const pesquisa = await client.search(busca, 'track');
-                    if (!pesquisa || pesquisa.length === 0) {
+                    // 1. Busca a música na sua nova API
+                    const response = await axios.get(`https://apimusic.thryl.com.br/search?q=${encodeURIComponent(busca)}`);
+                    const musicas = response.data;
+
+                    if (!musicas || musicas.length === 0) {
                         return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada com esse nome.' }, { quoted: m });
                     }
 
-                    const info = await client.getSongInfo(pesquisa[0].url);
-                    const stream = await info.downloadProgressive();
+                    const music = musicas[0];
+                    tempInputAudioPath = path.join('/tmp', `input_${Date.now()}.mp3`);
+                    arquivoTemporarioOgg = path.join('/tmp', `output_${Date.now()}.ogg`);
 
-                    const arquivoTemporarioOgg = path.join('/tmp', `api_${Date.now()}.ogg`);
+                    await sock.sendMessage(jid, { text: `🎧 Baixando: *${music.title}* de *${music.author}*` });
 
-                    await sock.sendMessage(jid, { text: `🎧 Processando: *${info.title}*` });
+                    // 2. Faz o download do áudio usando o ID retornado pela API
+                    // Nota: Assumi que o endpoint de download segue o padrão da API (/download?id=)
+                    const downloadUrl = `https://apimusic.thryl.com.br/download?id=${music.id}`;
+                    const resStream = await axios({
+                        method: 'get',
+                        url: downloadUrl,
+                        responseType: 'stream'
+                    });
 
-                    // Converte o stream do SoundCloud diretamente para OGG/Opus (formato nativo do WhatsApp)
+                    // Salva o stream em um arquivo temporário
                     await new Promise((resolve, reject) => {
-                        fluentFfmpeg(stream)
+                        const writer = fs.createWriteStream(tempInputAudioPath);
+                        resStream.data.pipe(writer);
+                        writer.on('finish', resolve);
+                        writer.on('error', reject);
+                    });
+
+                    // 3. Converte o arquivo local para OGG/Opus via FFmpeg
+                    await new Promise((resolve, reject) => {
+                        fluentFfmpeg(tempInputAudioPath)
                             .audioCodec('libopus')
                             .toFormat('ogg')
                             .on('end', resolve)
-                            .on('error', reject)
+                            .on('error', (err) => reject(new Error('Erro no FFmpeg: ' + err.message)))
                             .save(arquivoTemporarioOgg);
                     });
 
                     if (!fs.existsSync(arquivoTemporarioOgg) || fs.statSync(arquivoTemporarioOgg).size === 0) {
-                        throw new Error("O arquivo convertido está vazio.");
+                        throw new Error("Falha na conversão do áudio.");
                     }
 
                     const audioBuffer = fs.readFileSync(arquivoTemporarioOgg);
 
-                    // Envia como nota de voz no WhatsApp
-                    await sock.sendMessage(jid, { 
-                        audio: audioBuffer, 
-                        mimetype: 'audio/ogg; codecs=opus', 
-                        ptt: true 
+                    await sock.sendMessage(jid, {
+                        audio: audioBuffer,
+                        mimetype: 'audio/ogg; codecs=opus',
+                        ptt: true
                     }, { quoted: m });
 
-                    // Limpeza
-                    if (fs.existsSync(arquivoTemporarioOgg)) fs.unlinkSync(arquivoTemporarioOgg);
-
                 } catch (playErr) {
-                    console.error('Erro geral no comando play via API:', playErr);
-                    await sock.sendMessage(jid, { text: '❌ Erro ao processar a música. Tente outro nome ou link.' }, { quoted: m });
+                    console.error('Erro no comando play:', playErr.message);
+                    await sock.sendMessage(jid, { text: '❌ Erro ao processar música. Verifique o nome ou tente novamente.' }, { quoted: m });
+                } finally {
+                    // Limpeza de segurança dos arquivos temporários
+                    if (tempInputAudioPath && fs.existsSync(tempInputAudioPath)) fs.unlinkSync(tempInputAudioPath);
+                    if (arquivoTemporarioOgg && fs.existsSync(arquivoTemporarioOgg)) fs.unlinkSync(arquivoTemporarioOgg);
                 }
                 break;     
             case 'avisar':
