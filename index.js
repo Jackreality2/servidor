@@ -471,6 +471,7 @@ async function startAtrinoBot() {
                     // 2. Faz o download do áudio usando o ID retornado pela API
                     // Nota: Assumi que o endpoint de download segue o padrão da API (/download?id=)
                     const downloadUrl = `https://apimusic.thryl.com.br/download?id=${music.id}`;
+                    console.log(`Attempting to download from: ${downloadUrl}`); // Log the download URL
                     const resStream = await axios({
                         method: 'get',
                         url: downloadUrl,
@@ -508,8 +509,19 @@ async function startAtrinoBot() {
                     }, { quoted: m });
 
                 } catch (playErr) {
-                    console.error('Erro no comando play:', playErr.message);
-                    await sock.sendMessage(jid, { text: '❌ Erro ao processar música. Verifique o nome ou tente novamente.' }, { quoted: m });
+                    console.error('Erro no comando play:', playErr); // Log the full error object for detailed debugging
+                    let errorMessage = '❌ Erro ao processar música. Verifique o nome ou tente novamente.';
+
+                    if (playErr.response && playErr.response.status) {
+                        errorMessage = `❌ Erro na API (Status: ${playErr.response.status}). A música pode não estar disponível ou o serviço está com problemas.`;
+                    } else if (playErr.message && playErr.message.includes('FFmpeg')) {
+                        errorMessage = '❌ Erro na conversão do áudio (FFmpeg). O arquivo pode estar corrompido ou o formato não é suportado.';
+                    } else if (playErr.message && playErr.message.includes('Falha na conversão do áudio')) {
+                        errorMessage = '❌ A conversão do áudio falhou ou resultou em um arquivo vazio.';
+                    } else if (playErr.code === 'ENOENT' || (playErr.message && playErr.message.includes('connect ECONNREFUSED'))) {
+                        errorMessage = '❌ Erro de conexão ou arquivo não encontrado. Verifique a API ou o caminho do arquivo.';
+                    }
+                    await sock.sendMessage(jid, { text: errorMessage }, { quoted: m });
                 } finally {
                     // Limpeza de segurança dos arquivos temporários
                     if (tempInputAudioPath && fs.existsSync(tempInputAudioPath)) fs.unlinkSync(tempInputAudioPath);
