@@ -4,10 +4,7 @@ const P = require('pino');
 const qrcode = require('qrcode-terminal');
 const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 const cron = require('node-cron'); 
-const fs = require('fs');
 const http = require('http');
-const path = require('path');
-const Jimp = require('jimp');
 const axios = require('axios');
 
 // --- CORREÇÃO DEFINITIVA DO FFMPEG PARA O RENDER ---
@@ -420,7 +417,7 @@ async function startAtrinoBot() {
 
                     await sock.sendMessage(jid, {
                         audio: audioBuffer,
-                        mimetype: 'audio/mp4', // Mimetype padrão para áudio no WhatsApp
+                        mimetype: 'audio/mpeg', 
                         ptt: false,
                         fileName: `${data.title}.mp3`
                     }, { quoted: m });
