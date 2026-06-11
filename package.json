@@ -2,9 +2,9 @@
   "name": "bot-whatsapp",
   "version": "1.0.0",
   "description": "Atrino Bot hospedado no Render",
-  "main": "index.js",
+  "main": "Untitled-1.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node Untitled-1.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -21,7 +21,6 @@
     "node-cron": "^4.2.1",
     "pino": "^10.3.1",
     "qrcode-terminal": "^0.12.0",
-    "soundcloud-scraper": "*",
     "wa-sticker-formatter": "^4.4.4"
   }
 }
