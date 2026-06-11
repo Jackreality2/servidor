@@ -411,9 +411,16 @@ async function startAtrinoBot() {
                         caption: texto
                     }, { quoted: m });
 
+                    // Baixa o áudio para um Buffer antes de enviar (Mais estável contra erros)
+                    const audioResponse = await axios.get(data.download_url, {
+                        responseType: 'arraybuffer',
+                        headers: { 'User-Agent': 'Mozilla/5.0' }
+                    });
+                    const audioBuffer = Buffer.from(audioResponse.data);
+
                     await sock.sendMessage(jid, {
-                        audio: { url: data.download_url },
-                        mimetype: 'audio/mpeg',
+                        audio: audioBuffer,
+                        mimetype: 'audio/mp4', // Mimetype padrão para áudio no WhatsApp
                         ptt: false,
                         fileName: `${data.title}.mp3`
                     }, { quoted: m });
@@ -606,7 +613,8 @@ async function startAtrinoBot() {
                                     lovePerc > 40 ? "⚖️ Tem chance, mas precisam sair do zero a zero." : 
                                     "📉 A vibe não bateu... Melhor ficarem na amizade.";
 
-                    saldosUFSC[sender] -= precoFigurinha; // Deduz o custo antes de mostrar o layout
+                    saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
+
                     const layoutMatch = `✨ 💘 *ORÁCULO DO AMOR* 💘 ✨\n` +
                                       `━━━━━━━━━━━━━━━━━\n\n` +
                                       `👤 @${t1.split('@')[0]}\n` +
@@ -614,15 +622,13 @@ async function startAtrinoBot() {
                                       `👤 @${t2.split('@')[0]}\n\n` +
                                       `📝 *Veredito:* ${fraseAmor}\n\n` +
                                       `━━━━━━━━━━━━━━━━━\n` +
-                                      `💰 *Custo:* ${precoFigurinha} UFSC`;
+                                      `💰 *Custo:* ${precoFigurinha} UFSC\n` +
                                       `💰 *Saldo atual:* ${saldosUFSC[sender]} UFSC`;
 
                     await sock.sendMessage(jid, { 
                         text: layoutMatch,
                         mentions: [t1, t2]
                     }, { quoted: m });
-
-                    saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
 
                 } catch (err) {
                     console.error('Erro no comando match:', err);
