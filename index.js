@@ -14,10 +14,6 @@ const fluentFfmpeg = require('fluent-ffmpeg');
 // Define o caminho do binário estático do ffmpeg-static
 fluentFfmpeg.setFfmpegPath(ffmpegPath);
 
-// --- INTEGRAÇÃO DO SOUNDCLOUD ---
-// const SoundCloud = require("soundcloud-scraper"); // Não é mais necessário
-// const client = new SoundCloud.Client(); // Não é mais necessário
-
 const logger = P({ level: 'silent' });
 
 // --- CONFIGURAÇÕES MASTER ---
@@ -401,15 +397,19 @@ async function startAtrinoBot() {
                         return await sock.sendMessage(jid, { text: '❌ *ɴᴀ̃ᴏ ꜰᴏɪ ᴘᴏssɪ́ᴠᴇʟ ᴇɴᴄᴏɴᴛʀᴀʀ ᴏ ᴀᴜ́ᴅɪᴏ.*' }, { quoted: m });
                     }
 
-                    const texto = `\n 🎶 *ᴛɪ́ᴛᴜʟᴏ*: ${data.title}\n ⏰ *ᴅᴜʀᴀᴄ̧ᴀ̃ᴏ*: ${data.duration}\n 👤 *ᴄʀɪᴀᴅᴏʀ*: ✧･ﾟ: ᴅᴇᴠʟᴀʙ ✧･ﾟ:\n`;
+                    // A API v2 geralmente encapsula os dados em 'result'
+                    const info = data.result || data;
+                    const downloadUrl = info.download_url || info.url;
+
+                    const texto = `\n 🎶 *ᴛɪ́ᴛᴜʟᴏ*: ${info.title}\n ⏰ *ᴅᴜʀᴀᴄ̧ᴀ̃ᴏ*: ${info.duration || 'Desconhecida'}\n 👤 *ᴄʀɪᴀᴅᴏʀ*: ✧･ﾟ: ᴅᴇᴠʟᴀʙ ✧･ﾟ:\n`;
 
                     await sock.sendMessage(jid, {
-                        image: { url: data.thumbnail },
+                        image: { url: info.thumbnail },
                         caption: texto
                     }, { quoted: m });
 
                     // Baixa o áudio para um Buffer antes de enviar (Mais estável contra erros)
-                    const audioResponse = await axios.get(data.download_url, {
+                    const audioResponse = await axios.get(downloadUrl, {
                         responseType: 'arraybuffer',
                         headers: { 'User-Agent': 'Mozilla/5.0' }
                     });
@@ -419,7 +419,7 @@ async function startAtrinoBot() {
                         audio: audioBuffer,
                         mimetype: 'audio/mpeg', 
                         ptt: false,
-                        fileName: `${data.title}.mp3`
+                        fileName: `${info.title}.mp3`
                     }, { quoted: m });
 
                 } catch (playErr) {
