@@ -655,6 +655,11 @@ async function startAtrinoBot() {
                     });
                 }
 
+                // Proteção contra limite de caracteres (3900)
+                if (relTexto.length > 3800) {
+                    relTexto = relTexto.substring(0, 3800) + "\n\n⚠️ *O relatório foi encurtado por ser muito longo.*";
+                }
+
                 const buttons = [
                     { buttonId: '.relpdf', buttonText: { displayText: '📄 Transformar em PDF' }, type: 1 }
                 ];
@@ -723,6 +728,11 @@ async function startAtrinoBot() {
                 let textT = `📢 *AVISO GERAL*\n\n${args.join(' ') || 'Atenção!'}\n\n`;
                 let mnts = metadata.participants.map(p => p.id);
                 for (let mem of metadata.participants) textT += `➥ @${mem.id.split('@')[0]}\n`;
+
+                if (textT.length > 3800) {
+                    textT = textT.substring(0, 3800) + "\n\n⚠️ *Lista encurtada devido ao limite de caracteres.*";
+                }
+
                 await sock.sendMessage(jid, { text: textT, mentions: mnts });
                 break;
 
