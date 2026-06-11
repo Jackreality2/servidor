@@ -408,16 +408,17 @@ async function startAtrinoBot() {
                         caption: texto
                     }, { quoted: m });
 
-                    // Baixa o áudio para um Buffer antes de enviar (Mais estável contra erros)
-                    const audioResponse = await axios.get(downloadUrl, {
-                        responseType: 'arraybuffer',
+                    // Envia via Stream para economizar RAM no Render e não crashar o bot
+                    const audioResponse = await axios({
+                        method: 'get',
+                        url: downloadUrl,
+                        responseType: 'stream',
                         headers: { 'User-Agent': 'Mozilla/5.0' }
                     });
-                    const audioBuffer = Buffer.from(audioResponse.data);
 
                     await sock.sendMessage(jid, {
-                        audio: audioBuffer,
-                        mimetype: 'audio/mpeg', 
+                        audio: { stream: audioResponse.data },
+                        mimetype: 'audio/mpeg',
                         ptt: false,
                         fileName: `${info.title}.mp3`
                     }, { quoted: m });
