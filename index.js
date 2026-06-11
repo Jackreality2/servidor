@@ -39,7 +39,6 @@ let contagemAtiva = {};
 let saldosUFSC = {};
 let anagramaGame = { ativo: false, palavra: "", embaralhada: "", jid: "" };
 let notificacoesAtivas = {};
-let ultimoVideoTikTok = null;
 let solicitacoesPendentes = {};
 let precoFigurinha = 2;
 let ultimaInteracao = {};
@@ -55,57 +54,6 @@ function gerarAnagrama() {
         [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return { original: palavra, embaralhada: arr.join('').toUpperCase() };
-}
-
-// --- SISTEMA DE MONITORAMENTO TIKTOK ---
-async function buscarVideoTikTok(sock, jid, manual = false) {
-    try {
-        const profileUser = 'meetsocietyofc';
-        // Usando uma API pública de busca/scrape para evitar bloqueios diretos do TikTok
-        const response = await axios.get(`https://www.tiktok.com/@${profileUser}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36' }
-        });
-
-        // Lógica simplificada para extrair o primeiro vídeo não fixado
-        // Nota: Em um ambiente de produção, recomenda-se o uso de uma biblioteca de scrape ou API paga
-        const html = response.data;
-        // Busca IDs de vídeo através do padrão de URL no HTML (mais preciso que procurar por qualquer "id")
-        // Isso evita que o ID do usuário seja confundido com o ID de um vídeo
-        const videoIds = html.match(/\/video\/(\d+)/g)?.map(v => v.match(/\d+/)[0]) || [];
-        
-        const videoAtual = videoIds[0]; 
-        
-        // Extrai a legenda (descrição) do vídeo
-        const descriptions = html.match(/"desc":"(.*?)"/g)
-            ?.map(desc => desc.replace(/"desc":"|"/g, '')) || [];
-        const legenda = descriptions[0] || "Sem legenda disponível.";
-
-        if (!videoAtual) return manual ? sock.sendMessage(jid, { text: "❌ Não consegui encontrar vídeos recentes agora." }) : null;
-
-        const linkVideo = `https://www.tiktok.com/@${profileUser}/video/${videoAtual}`;
-
-        if (manual || videoAtual !== ultimoVideoTikTok) {
-            if (!manual) ultimoVideoTikTok = videoAtual;
-
-            const layoutTikTok = `╭─── [ 🎬 *TIKTOK ATUALIZADO* ] ───╮\n` +
-                               `│\n` +
-                               `│ 📱 *Canal:* @${profileUser}\n` +
-                               `│ ✨ *Opa! Tem vídeo novo na área.*\n` +
-                               `│\n` +
-                               `│ 📝 *Legenda:* ${legenda}\n` +
-                               `│\n` +
-                               `│ 🔗 *Link do vídeo:*\n` +
-                               `│ ${linkVideo}\n` +
-                               `│\n` +
-                               `│ 🚀 *Vá lá dar aquela força!*\n` +
-                               `╰─────────────────────╯`;
-
-            await sock.sendMessage(jid, { text: layoutTikTok });
-        }
-    } catch (err) {
-        console.error("Erro ao buscar TikTok:", err.message);
-        if (manual) await sock.sendMessage(jid, { text: "❌ Erro ao acessar o perfil do TikTok." });
-    }
 }
 
 // --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
@@ -235,11 +183,6 @@ async function startAtrinoBot() {
             await sock.sendMessage(ID_DO_GRUPO, { text: textoAberto });
         } catch (err) {}
     }, { timezone: "America/Sao_Paulo" });
-
-    // Monitoramento Automático TikTok (A cada 30 minutos)
-    cron.schedule('*/30 * * * *', async () => {
-        await buscarVideoTikTok(sock, ID_DO_GRUPO);
-    });
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -409,7 +352,6 @@ async function startAtrinoBot() {
 │ ➥ .mat @user - Calcular Match
 │
 │ 👮 *Admin:*
-│ ➥ .avisar - Último vídeo TikTok
 │ ➥ .play [nome] - Tocar música
 │ ➥ .cep [cep] - Consulta CEP
 │ ➥ .contador - Ativar/Desativar contagem
@@ -443,100 +385,42 @@ async function startAtrinoBot() {
             case 'play':
             case 'yt':
             case 'youtube':
-                let tempInputAudioPath = null;
-                let arquivoTemporarioOgg = null;
                 try {
                     if (!isSenderAdmin) {
                         return await sock.sendMessage(jid, { text: '❌ Apenas administradores podem usar o comando de música!' }, { quoted: m });
                     }
 
                     const busca = args.join(' ');
-                    if (!busca) return await sock.sendMessage(jid, { text: '❌ Digite o nome da música ou o link! Exemplo: .play Nome da Musica' }, { quoted: m });
-
-                    await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}" no TikTok...` }, { quoted: m });
-
-                    // 1. Busca vídeos e detalhes no TikTok usando a API vreden.my.id (via Pastebin)
-                    const searchRes = await axios.get(`https://api.vreden.my.id/api/tiktoksearch?query=${encodeURIComponent(busca)}`);
-                    
-                    if (!searchRes.data.result || searchRes.data.result.length === 0) {
-                        return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada.' }, { quoted: m });
+                    if (!busca) {
+                        return await sock.sendMessage(jid, { text: `❌ *ᴇxᴇᴍᴘʟᴏ:*\n.play MC Kevin` }, { quoted: m });
                     }
 
-                    const videoUrl = searchRes.data.result[0].url;
-                    const detailRes = await axios.get(`https://api.vreden.my.id/api/tiktok?url=${videoUrl}`);
+                    await sock.sendMessage(jid, { text: '🔎 ʙᴜsᴄᴀɴᴅᴏ ᴀᴜ́ᴅɪᴏ...' }, { quoted: m });
 
-                    if (!detailRes.data.status || !detailRes.data.result.music) {
-                        return await sock.sendMessage(jid, { text: '❌ Falha ao obter detalhes do áudio.' }, { quoted: m });
+                    const api = `https://systemzone.store/api/play?text=${encodeURIComponent(busca)}`;
+                    const { data } = await axios.get(api);
+
+                    if (!data?.status) {
+                        return await sock.sendMessage(jid, { text: '❌ *ɴᴀ̃ᴏ ꜰᴏɪ ᴘᴏssɪ́ᴠᴇʟ ᴇɴᴄᴏɴᴛʀᴀʀ ᴏ ᴀᴜ́ᴅɪᴏ.*' }, { quoted: m });
                     }
 
-                    const musicTitle = detailRes.data.result.title || "Música do TikTok";
-                    const downloadUrl = detailRes.data.result.music;
-
-                    // Verifica se a URL de download foi encontrada
-                    tempInputAudioPath = path.join('/tmp', `input_${Date.now()}.mp3`);
-                    arquivoTemporarioOgg = path.join('/tmp', `output_${Date.now()}.ogg`);
-
-                    if (!downloadUrl) {
-                        return await sock.sendMessage(jid, { text: `❌ Não foi possível obter o link de áudio para "${musicTitle}".` }, { quoted: m });
-                    }
-
-                    await sock.sendMessage(jid, { text: `🎧 Processando: *${musicTitle}*` });
-
-                    // 2. Faz o download do áudio da URL obtida
-                    const resStream = await axios({
-                        method: 'get',
-                        url: downloadUrl,
-                        responseType: 'stream'
-                    });
-
-                    // Salva o stream em um arquivo temporário
-                    await new Promise((resolve, reject) => {
-                        const writer = fs.createWriteStream(tempInputAudioPath);
-                        resStream.data.pipe(writer);
-                        writer.on('finish', resolve);
-                        writer.on('error', reject);
-                    });
-
-                    // 3. Converte o arquivo local para OGG/Opus via FFmpeg
-                    await new Promise((resolve, reject) => {
-                        fluentFfmpeg(tempInputAudioPath)
-                            .audioCodec('libopus')
-                            .toFormat('ogg')
-                            .on('end', resolve)
-                            .on('error', (err) => reject(new Error('Erro no FFmpeg: ' + err.message)))
-                            .save(arquivoTemporarioOgg);
-                    });
-
-                    if (!fs.existsSync(arquivoTemporarioOgg) || fs.statSync(arquivoTemporarioOgg).size === 0) {
-                        throw new Error("Falha na conversão do áudio.");
-                    }
-
-                    const audioBuffer = fs.readFileSync(arquivoTemporarioOgg);
+                    const texto = `\n 🎶 *ᴛɪ́ᴛᴜʟᴏ*: ${data.title}\n ⏰ *ᴅᴜʀᴀᴄ̧ᴀ̃ᴏ*: ${data.duration}\n 👤 *ᴄʀɪᴀᴅᴏʀ*: ✧･ﾟ: ᴅᴇᴠʟᴀʙ ✧･ﾟ:\n`;
 
                     await sock.sendMessage(jid, {
-                        audio: audioBuffer,
-                        mimetype: 'audio/ogg; codecs=opus',
-                        ptt: true
+                        image: { url: data.thumbnail },
+                        caption: texto
+                    }, { quoted: m });
+
+                    await sock.sendMessage(jid, {
+                        audio: { url: data.download_url },
+                        mimetype: 'audio/mpeg',
+                        ptt: false,
+                        fileName: `${data.title}.mp3`
                     }, { quoted: m });
 
                 } catch (playErr) {
-                    console.error('Erro no comando play:', playErr); // Log the full error object for detailed debugging
-                    let errorMessage = '❌ Erro ao processar música. Verifique o nome ou tente novamente.';
-
-                    if (playErr.response && playErr.response.status) {
-                        errorMessage = `❌ Erro na API (Status: ${playErr.response.status}). A música pode não estar disponível ou o serviço está com problemas.`;
-                    } else if (playErr.message && playErr.message.includes('FFmpeg')) {
-                        errorMessage = '❌ Erro na conversão do áudio (FFmpeg). O arquivo pode estar corrompido ou o formato não é suportado.';
-                    } else if (playErr.message && playErr.message.includes('Falha na conversão do áudio')) {
-                        errorMessage = '❌ A conversão do áudio falhou ou resultou em um arquivo vazio.';
-                    } else if (playErr.code === 'ENOENT' || (playErr.message && playErr.message.includes('connect ECONNREFUSED'))) {
-                        errorMessage = '❌ Erro de conexão ou arquivo não encontrado. Verifique a API ou o caminho do arquivo.';
-                    }
-                    await sock.sendMessage(jid, { text: errorMessage }, { quoted: m });
-                } finally {
-                    // Limpeza de segurança dos arquivos temporários
-                    if (tempInputAudioPath && fs.existsSync(tempInputAudioPath)) fs.unlinkSync(tempInputAudioPath);
-                    if (arquivoTemporarioOgg && fs.existsSync(arquivoTemporarioOgg)) fs.unlinkSync(arquivoTemporarioOgg);
+                    console.error('Erro no comando play:', playErr);
+                    await sock.sendMessage(jid, { text: '❌ *ᴇʀʀᴏ ᴀᴏ ʙᴀɪxᴀʀ ᴏ ᴀᴜ́ᴅɪᴏ.*' }, { quoted: m });
                 }
                 break;
 
@@ -594,11 +478,6 @@ async function startAtrinoBot() {
                     await sock.sendMessage(jid, { text: '❌ Erro ao realizar consulta por nome.' });
                 }
                 break;     
-            case 'avisar':
-                if (!isSenderAdmin) return;
-                await sock.sendMessage(jid, { text: "🔎 Buscando vídeo mais recente..." });
-                await buscarVideoTikTok(sock, jid, true);
-                break;
             case 's':
             case 'sticker':
                 try {
