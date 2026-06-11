@@ -394,7 +394,7 @@ async function startAtrinoBot() {
 
                     await sock.sendMessage(jid, { text: '🔎 ʙᴜsᴄᴀɴᴅᴏ ᴀᴜ́ᴅɪᴏ...' }, { quoted: m });
 
-                    const api = `https://systemzone.store/api/play?text=${encodeURIComponent(busca)}`;
+                    const api = `https://systemzone.store/v2/player?apikey=freekey&text=${encodeURIComponent(busca)}`;
                     const { data } = await axios.get(api);
 
                     if (!data?.status) {
