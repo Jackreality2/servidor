@@ -2,9 +2,9 @@
   "name": "bot-whatsapp",
   "version": "1.0.0",
   "description": "Atrino Bot hospedado no Render",
-  "main": "Untitled-1.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node Untitled-1.js",
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
