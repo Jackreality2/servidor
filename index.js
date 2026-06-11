@@ -455,17 +455,22 @@ async function startAtrinoBot() {
 
                     await sock.sendMessage(jid, { text: `🎵 Buscando "${busca}" no TikTok...` }, { quoted: m });
 
-                    // 1. Busca vídeos no TikTok usando a API TikWM
-                    // Esta API geralmente retorna prévias de 30 segundos.
-                    const apiRes = await axios.get(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(busca)}`);
+                    // 1. Busca vídeos e detalhes no TikTok usando a API vreden.my.id (via Pastebin)
+                    const searchRes = await axios.get(`https://api.vreden.my.id/api/tiktoksearch?query=${encodeURIComponent(busca)}`);
                     
-                    if (!apiRes.data || apiRes.data.code !== 0 || !apiRes.data.data.videos || apiRes.data.data.videos.length === 0) {
-                        return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada no TikTok com esse nome.' }, { quoted: m });
+                    if (!searchRes.data.result || searchRes.data.result.length === 0) {
+                        return await sock.sendMessage(jid, { text: '❌ Nenhuma música encontrada.' }, { quoted: m });
                     }
 
-                    const firstVideo = apiRes.data.data.videos[0];
-                    const musicTitle = firstVideo.music_info?.title || firstVideo.title || "Música do TikTok";
-                    const downloadUrl = firstVideo.music; // URL direta do áudio (.mp3) fornecida pela TikWM
+                    const videoUrl = searchRes.data.result[0].url;
+                    const detailRes = await axios.get(`https://api.vreden.my.id/api/tiktok?url=${videoUrl}`);
+
+                    if (!detailRes.data.status || !detailRes.data.result.music) {
+                        return await sock.sendMessage(jid, { text: '❌ Falha ao obter detalhes do áudio.' }, { quoted: m });
+                    }
+
+                    const musicTitle = detailRes.data.result.title || "Música do TikTok";
+                    const downloadUrl = detailRes.data.result.music;
 
                     // Verifica se a URL de download foi encontrada
                     tempInputAudioPath = path.join('/tmp', `input_${Date.now()}.mp3`);
@@ -623,6 +628,9 @@ async function startAtrinoBot() {
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
                         await sock.sendMessage(jid, { text: `✅ Figurinha criada! 💰 Seu saldo atual: *${saldosUFSC[sender]} UFSC*` }, { quoted: m });
+                        await sock.sendMessage(jid, { text: `✅ Figurinha criada! 💰 Seu saldo atual: *${saldosUFSC[sender]} UFSC*` });
+                        
+                        try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
                     } else {
                         await sock.sendMessage(jid, { text: '❌ Envie uma foto ou responda a uma com .s' + logComando, mentions: [sender] });
                         
