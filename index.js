@@ -413,7 +413,6 @@ async function startAtrinoBot() {
 │
 ╰───────────────────╯`;
                 await sock.sendMessage(jid, { text: menu + logComando, mentions: [sender] }, { quoted: m });
-                await sock.sendMessage(jid, { text: menu }, { quoted: m });
                 break;
 
             case 'registrar':
