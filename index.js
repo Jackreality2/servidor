@@ -426,6 +426,7 @@ async function startAtrinoBot() {
 │
 │ 🧑‍🤝‍🧑 *Membros:*
 │ ➥ .registrar - Ativar bot no grupo
+│ ➥ .desativa_bot - Desativar bot
 │ ➥ .s - Figurinha (Foto)
 │ ➥ .a - Figurinha Animada (Vídeo)
 │ ➥ .mat @user - Calcular Match
@@ -477,6 +478,32 @@ async function startAtrinoBot() {
                 await syncGruposToGithub(gruposRegistrados);
                 senhaRegistro = null; // Invalida a senha após o primeiro uso bem-sucedido
                 await sock.sendMessage(jid, { text: '🚀 *GRUPO REGISTRADO COM SUCESSO!*\n\nO bot agora está oficialmente ativo neste salão e salvo na nuvem.' }, { quoted: m });
+                break;
+
+            case 'desativa_bot':
+                if (!isSenderAdmin) return;
+                const senhaDesat = args[0];
+                if (!senhaRegistro || senhaDesat !== senhaRegistro) {
+                    return await sock.sendMessage(jid, { 
+                        text: `⚠️ *ACESSO NEGADO*\n\nPara desativar o bot, você precisa da senha gerada no painel.\n\n🔗 https://servidor-jct9.onrender.com/` 
+                    }, { quoted: m });
+                }
+
+                const avisoDesat = `╭─── [ ⚠️ *BOT DESATIVADO* ] ───╮\n│\n│ 🛑 *Atenção:* O registro deste grupo foi removido.\n│\n│ ➥ O bot sairá do grupo em *5 minutos*.\n│ ➥ Comandos desativados imediatamente.\n│ ➥ Foi um prazer estar com vocês!\n│\n╰─────────────────────╯`;
+                await sock.sendMessage(jid, { text: avisoDesat });
+
+                // Remove o JID da lista e sincroniza com o GitHub
+                gruposRegistrados = gruposRegistrados.filter(id => id !== jid);
+                await syncGruposToGithub(gruposRegistrados);
+                senhaRegistro = null; // Invalida a senha
+
+                // Agenda a saída do grupo
+                setTimeout(async () => {
+                    try {
+                        await sock.sendMessage(jid, { text: '👋 *O tempo de permanência acabou. Saindo agora...*' });
+                        await sock.groupLeave(jid);
+                    } catch (e) { console.error('Erro ao sair do grupo:', e); }
+                }, 300000); // 5 minutos em milissegundos
                 break;
 
             case 'cep':
