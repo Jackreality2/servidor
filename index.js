@@ -40,7 +40,12 @@ let gruposRegistrados = [];
 
 // --- FUNÇÕES DE SINCRONIZAÇÃO GITHUB ---
 async function syncGruposToGithub(grupos) {
-    const config = { token: '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', owner: 'Jackreality2', repo: 'servidor', path: 'grupos_registrados.json' };
+    const config = { 
+        token: process.env.GITHUB_TOKEN, 
+        owner: 'Jackreality2', 
+        repo: 'servidor', 
+        path: 'grupos_registrados.json' 
+    };
     if (!config.token || !config.owner || !config.repo) return console.log('⚠️ Configurações do GitHub ausentes.');
     
     const headers = { 
@@ -70,7 +75,12 @@ async function syncGruposToGithub(grupos) {
 }
 
 async function loadGruposFromGithub() {
-    const config = { token: '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', owner: 'Jackreality2', repo: 'servidor', path: 'grupos_registrados.json' };
+    const config = { 
+        token: process.env.GITHUB_TOKEN, 
+        owner: 'Jackreality2', 
+        repo: 'servidor', 
+        path: 'grupos_registrados.json' 
+    };
     if (!config.token || !config.owner || !config.repo) return;
     
     const headers = { 'Authorization': `Bearer ${config.token}`, 'User-Agent': 'AtrinoBot-Sync' };
