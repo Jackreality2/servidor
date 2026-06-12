@@ -37,6 +37,7 @@ let solicitacoesPendentes = {};
 let precoFigurinha = 2;
 let ultimaInteracao = {};
 let gruposRegistrados = [];
+let senhaRegistro = null;
 
 // --- FUNÇÕES DE SINCRONIZAÇÃO GITHUB ---
 async function syncGruposToGithub(grupos) {
@@ -111,6 +112,14 @@ const PORT = parseInt(process.env.PORT, 10) || 7860;
 
 // --- SERVIDOR WEB DE MONITORAMENTO E QR CODE ---
 http.createServer((req, res) => {
+    // Rota para gerar a senha aleatória
+    if (req.url === '/gerar-senha') {
+        senhaRegistro = Math.random().toString(36).substring(2, 8).toUpperCase();
+        res.writeHead(302, { 'Location': '/' });
+        res.end();
+        return;
+    }
+
     // Caso o bot já esteja conectado e ativo
     if (!qrAtual) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -120,13 +129,24 @@ http.createServer((req, res) => {
                     <title>Atrino Bot - Status</title>
                     <style>
                         body { font-family: Arial, sans-serif; text-align: center; margin-top: 80px; background-color: #0f0c1b; color: #00ffcc; }
-                        .card { background: #17142b; display: inline-block; padding: 30px; border-radius: 15px; border: 1px solid #3d3475; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+                        .card { background: #17142b; display: inline-block; padding: 40px; border-radius: 15px; border: 1px solid #3d3475; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+                        .btn { display: inline-block; margin-top: 20px; padding: 15px 30px; background: #00ffcc; color: #0f0c1b; text-decoration: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
+                        .btn:hover { background: #ffffff; transform: scale(1.05); }
+                        .senha { font-size: 2em; background: #111; padding: 10px 20px; border-radius: 10px; margin: 20px 0; border: 2px dashed #00ffcc; display: block; }
                     </style>
                 </head>
                 <body>
                     <div class="card">
-                        <h1>🚀 Atrino Bot: Conectado e Ativo!</h1>
+                        <h1>🚀 Atrino Bot: Conectado!</h1>
                         <p style="color: #b3b0cb;">O monitoramento e o keep-alive no Render estão rodando perfeitamente.</p>
+                        
+                        ${senhaRegistro ? `
+                            <p style="color: #fff;">Senha de Registro Atual:</p>
+                            <span class="senha">${senhaRegistro}</span>
+                            <p style="font-size: 0.9em; color: #888;">Digite <b>.registrar ${senhaRegistro}</b> no grupo desejado.</p>
+                        ` : '<p style="color: #ee5253;">Nenhuma senha ativa no momento.</p>'}
+                        
+                        <a href="/gerar-senha" class="btn">🔄 GERAR NOVA SENHA</a>
                     </div>
                 </body>
             </html>
@@ -440,17 +460,22 @@ async function startAtrinoBot() {
                 break;
 
             case 'registrar':
-                if (sender !== DONO_SUPREMO) {
-                    return await sock.sendMessage(jid, { text: '❌ Apenas o criador do bot (+55 21 98316-1582) pode autorizar o registro de novos grupos!' }, { quoted: m });
-                }
                 if (gruposRegistrados.includes(jid)) {
                     return await sock.sendMessage(jid, { text: '✅ Este grupo já está registrado e ativo!' }, { quoted: m });
+                }
+
+                const senhaInput = args[0];
+                if (!senhaRegistro || senhaInput !== senhaRegistro) {
+                    return await sock.sendMessage(jid, { 
+                        text: `⚠️ *ACESSO NEGADO*\n\nPara ativar o bot neste grupo, você precisa de uma senha válida.\n\nGere uma senha agora no painel:\n🔗 https://servidor-jct9.onrender.com/` 
+                    }, { quoted: m });
                 }
                 
                 await sock.sendMessage(jid, { text: '⏳ *Processando registro e sincronizando com GitHub...*' }, { quoted: m });
                 gruposRegistrados.push(jid);
                 
                 await syncGruposToGithub(gruposRegistrados);
+                senhaRegistro = null; // Invalida a senha após o primeiro uso bem-sucedido
                 await sock.sendMessage(jid, { text: '🚀 *GRUPO REGISTRADO COM SUCESSO!*\n\nO bot agora está oficialmente ativo neste salão e salvo na nuvem.' }, { quoted: m });
                 break;
 
