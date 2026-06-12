@@ -345,7 +345,6 @@ async function startAtrinoBot() {
 │ ➥ .mat @user - Calcular Match
 │
 │ 👮 *Admin:*
-│ ➥ .play [nome] - Tocar música
 │ ➥ .cep [cep] - Consulta CEP
 │ ➥ .contador - Ativar/Desativar contagem
 │ ➥ .citar - Marcar alvo para flood
@@ -373,59 +372,6 @@ async function startAtrinoBot() {
 ╰───────────────────╯`;
                 await sock.sendMessage(jid, { text: menu + logComando, mentions: [sender] }, { quoted: m });
                 await sock.sendMessage(jid, { text: menu }, { quoted: m });
-                break;
-
-            case 'play':
-            case 'yt':
-            case 'youtube':
-                try {
-                    if (!isSenderAdmin) {
-                        return await sock.sendMessage(jid, { text: '❌ Apenas administradores podem usar o comando de música!' }, { quoted: m });
-                    }
-
-                    const busca = args.join(' ');
-                    if (!busca) {
-                        return await sock.sendMessage(jid, { text: `❌ *ᴇxᴇᴍᴘʟᴏ:*\n.play MC Kevin` }, { quoted: m });
-                    }
-
-                    await sock.sendMessage(jid, { text: '🔎 ʙᴜsᴄᴀɴᴅᴏ ᴀᴜ́ᴅɪᴏ...' }, { quoted: m });
-
-                    const api = `https://systemzone.store/v2/player?apikey=freekey&text=${encodeURIComponent(busca)}`;
-                    const { data } = await axios.get(api);
-
-                    if (!data?.status) {
-                        return await sock.sendMessage(jid, { text: '❌ *ɴᴀ̃ᴏ ꜰᴏɪ ᴘᴏssɪ́ᴠᴇʟ ᴇɴᴄᴏɴᴛʀᴀʀ ᴏ ᴀᴜ́ᴅɪᴏ.*' }, { quoted: m });
-                    }
-
-                    // A API v2 geralmente encapsula os dados em 'result'
-                    const info = data.result || data;
-                    const downloadUrl = info.download_url || info.url || info.link;
-                    const title = info.title || 'Música';
-
-                    if (!downloadUrl) {
-                        return await sock.sendMessage(jid, { text: '❌ *Link de download não encontrado para este áudio.*' }, { quoted: m });
-                    }
-
-                    const texto = `\n 🎶 *ᴛɪ́ᴛᴜʟᴏ*: ${title}\n ⏰ *ᴅᴜʀᴀᴄ̧ᴀ̃ᴏ*: ${info.duration || 'Desconhecida'}\n 👤 *ᴄʀɪᴀᴅᴏʀ*: ✧･ﾟ: ᴅᴇᴠʟᴀʙ ✧･ﾟ:\n`;
-
-                    // Envia a thumbnail apenas se ela existir para evitar erro de URL undefined
-                    if (info.thumbnail) {
-                        await sock.sendMessage(jid, { image: { url: info.thumbnail }, caption: texto }, { quoted: m });
-                    }
-
-                    // Enviar a URL diretamente para o Baileys é muito mais estável no Render
-                    // Isso evita crashes por estouro de memória ou erros de stream não capturados
-                    await sock.sendMessage(jid, {
-                        audio: { url: downloadUrl },
-                        mimetype: 'audio/mpeg',
-                        ptt: false,
-                        fileName: `${title}.mp3`
-                    }, { quoted: m });
-
-                } catch (playErr) {
-                    console.error('Erro no comando play:', playErr);
-                    await sock.sendMessage(jid, { text: '❌ *ᴇʀʀᴏ ᴀᴏ ʙᴀɪxᴀʀ ᴏ ᴀᴜ́ᴅɪᴏ.*' }, { quoted: m });
-                }
                 break;
 
             case 'cep':
