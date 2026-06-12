@@ -42,28 +42,42 @@ let gruposRegistrados = [];
 async function syncGruposToGithub(grupos) {
     const config = { token: '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', owner: 'Jackreality2', repo: 'servidor', path: 'grupos_registrados.json' };
     if (!config.token || !config.owner || !config.repo) return console.log('⚠️ Configurações do GitHub ausentes.');
+    
+    const headers = { 
+        'Authorization': `Bearer ${config.token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'AtrinoBot-Sync'
+    };
+
     try {
         const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.path}`;
         let sha;
         try {
-            const getFile = await axios.get(url, { headers: { 'Authorization': `Bearer ${config.token}` } });
+            const getFile = await axios.get(url, { headers });
             sha = getFile.data.sha;
         } catch (e) {}
+
         await axios.put(url, {
             message: `Update registered groups: ${new Date().toISOString()}`,
             content: Buffer.from(JSON.stringify(grupos, null, 2)).toString('base64'),
             sha: sha
-        }, { headers: { 'Authorization': `Bearer ${config.token}` } });
-        console.log('✅ Grupos sincronizados com GitHub.');
-    } catch (err) { console.error('❌ Erro GitHub:', err.message); }
+        }, { headers });
+        
+        console.log(`✅ Grupos sincronizados com GitHub. Total: ${grupos.length}`);
+    } catch (err) { 
+        console.error('❌ Erro GitHub:', err.response?.data?.message || err.message); 
+    }
 }
 
 async function loadGruposFromGithub() {
     const config = { token: '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', owner: 'Jackreality2', repo: 'servidor', path: 'grupos_registrados.json' };
     if (!config.token || !config.owner || !config.repo) return;
+    
+    const headers = { 'Authorization': `Bearer ${config.token}`, 'User-Agent': 'AtrinoBot-Sync' };
+
     try {
         const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.path}`;
-        const res = await axios.get(url, { headers: { 'Authorization': `Bearer ${config.token}` } });
+        const res = await axios.get(url, { headers });
         gruposRegistrados = JSON.parse(Buffer.from(res.data.content, 'base64').toString('utf-8'));
         console.log('✅ Grupos carregados do GitHub.');
     } catch (e) { console.log('ℹ️ Nenhum registro encontrado no GitHub, iniciando limpo.'); }
@@ -510,7 +524,6 @@ async function startAtrinoBot() {
                         await sock.sendMessage(jid, await sticker.toMessage());
                         
                         saldosUFSC[sender] -= precoFigurinha; // Deduz o custo
-                        await sock.sendMessage(jid, { text: `✅ Figurinha criada! 💰 Seu saldo atual: *${saldosUFSC[sender]} UFSC*` }, { quoted: m });
                         await sock.sendMessage(jid, { text: `✅ Figurinha criada! 💰 Seu saldo atual: *${saldosUFSC[sender]} UFSC*` });
                         
                         try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
@@ -569,7 +582,6 @@ async function startAtrinoBot() {
                         
                         try { await sock.sendMessage(jid, { delete: m.key }); } catch {}
                     } else {
-                        await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' + logComando, mentions: [sender] });
                         await sock.sendMessage(jid, { text: '❌ Responda a um vídeo ou envie um com o comando .a para fazer uma figurinha animada!' }, { quoted: m });
                     }
                 } catch (err) {
