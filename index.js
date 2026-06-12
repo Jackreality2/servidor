@@ -6,6 +6,7 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 const cron = require('node-cron'); 
 const http = require('http');
 const axios = require('axios');
+const fs = require('fs');
 
 // --- CORREÇÃO DEFINITIVA DO FFMPEG PARA O RENDER ---
 const ffmpegPath = require('ffmpeg-static');
@@ -35,6 +36,38 @@ let notificacoesAtivas = {};
 let solicitacoesPendentes = {};
 let precoFigurinha = 2;
 let ultimaInteracao = {};
+let gruposRegistrados = [];
+
+// --- FUNÇÕES DE SINCRONIZAÇÃO GITHUB ---
+async function syncGruposToGithub(grupos) {
+    const config = { token: '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', owner: 'Jackreality2', repo: 'servidor', path: 'grupos_registrados.json' };
+    if (!config.token || !config.owner || !config.repo) return console.log('⚠️ Configurações do GitHub ausentes.');
+    try {
+        const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.path}`;
+        let sha;
+        try {
+            const getFile = await axios.get(url, { headers: { 'Authorization': `Bearer ${config.token}` } });
+            sha = getFile.data.sha;
+        } catch (e) {}
+        await axios.put(url, {
+            message: `Update registered groups: ${new Date().toISOString()}`,
+            content: Buffer.from(JSON.stringify(grupos, null, 2)).toString('base64'),
+            sha: sha
+        }, { headers: { 'Authorization': `Bearer ${config.token}` } });
+        console.log('✅ Grupos sincronizados com GitHub.');
+    } catch (err) { console.error('❌ Erro GitHub:', err.message); }
+}
+
+async function loadGruposFromGithub() {
+    const config = { token: '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', owner: 'Jackreality2', repo: 'servidor', path: 'grupos_registrados.json' };
+    if (!config.token || !config.owner || !config.repo) return;
+    try {
+        const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.path}`;
+        const res = await axios.get(url, { headers: { 'Authorization': `Bearer ${config.token}` } });
+        gruposRegistrados = JSON.parse(Buffer.from(res.data.content, 'base64').toString('utf-8'));
+        console.log('✅ Grupos carregados do GitHub.');
+    } catch (e) { console.log('ℹ️ Nenhum registro encontrado no GitHub, iniciando limpo.'); }
+}
 
 // --- PALAVRAS PARA ANAGRAMA (Simulando IA) ---
 const listaPalavras = ["computador", "whatsapp", "javascript", "teclado", "celular", "inteligencia", "programador", "saturno", "banana", "guitarra", "futebol", "universo"];
@@ -108,6 +141,7 @@ http.createServer((req, res) => {
 });
 
 async function startAtrinoBot() {
+    await loadGruposFromGithub();
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
     
     if (state.creds && state.creds.signedRegistrationInfo) {
@@ -288,6 +322,13 @@ async function startAtrinoBot() {
         const args = body.slice(1).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
+        // --- BLOQUEIO DE SEGURANÇA: SÓ FUNCIONA SE REGISTRADO ---
+        if (!gruposRegistrados.includes(jid) && command !== 'registrar') {
+            // Se o grupo não estiver registrado, o bot ignora silenciosamente todos os comandos
+            // exceto o próprio comando de registro.
+            return;
+        }
+
         // --- LOG DE COMANDO PARA RESPOSTAS ---
         const agoraCmd = new Date();
         const horarioCmd = agoraCmd.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -340,6 +381,7 @@ async function startAtrinoBot() {
                 const menu = `╭─── [ ATRINO BOT ] ───╮
 │
 │ 🧑‍🤝‍🧑 *Membros:*
+│ ➥ .registrar - Ativar bot no grupo
 │ ➥ .s - Figurinha (Foto)
 │ ➥ .a - Figurinha Animada (Vídeo)
 │ ➥ .mat @user - Calcular Match
@@ -372,6 +414,19 @@ async function startAtrinoBot() {
 ╰───────────────────╯`;
                 await sock.sendMessage(jid, { text: menu + logComando, mentions: [sender] }, { quoted: m });
                 await sock.sendMessage(jid, { text: menu }, { quoted: m });
+                break;
+
+            case 'registrar':
+                if (!isSenderAdmin) return;
+                if (gruposRegistrados.includes(jid)) {
+                    return await sock.sendMessage(jid, { text: '✅ Este grupo já está registrado e ativo!' }, { quoted: m });
+                }
+                
+                await sock.sendMessage(jid, { text: '⏳ *Processando registro e sincronizando com GitHub...*' }, { quoted: m });
+                gruposRegistrados.push(jid);
+                
+                await syncGruposToGithub(gruposRegistrados);
+                await sock.sendMessage(jid, { text: '🚀 *GRUPO REGISTRADO COM SUCESSO!*\n\nO bot agora está oficialmente ativo neste salão e salvo na nuvem.' }, { quoted: m });
                 break;
 
             case 'cep':
