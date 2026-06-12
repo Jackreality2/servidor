@@ -399,28 +399,27 @@ async function startAtrinoBot() {
 
                     // A API v2 geralmente encapsula os dados em 'result'
                     const info = data.result || data;
-                    const downloadUrl = info.download_url || info.url;
+                    const downloadUrl = info.download_url || info.url || info.link;
+                    const title = info.title || 'Música';
 
-                    const texto = `\n 🎶 *ᴛɪ́ᴛᴜʟᴏ*: ${info.title}\n ⏰ *ᴅᴜʀᴀᴄ̧ᴀ̃ᴏ*: ${info.duration || 'Desconhecida'}\n 👤 *ᴄʀɪᴀᴅᴏʀ*: ✧･ﾟ: ᴅᴇᴠʟᴀʙ ✧･ﾟ:\n`;
+                    if (!downloadUrl) {
+                        return await sock.sendMessage(jid, { text: '❌ *Link de download não encontrado para este áudio.*' }, { quoted: m });
+                    }
 
+                    const texto = `\n 🎶 *ᴛɪ́ᴛᴜʟᴏ*: ${title}\n ⏰ *ᴅᴜʀᴀᴄ̧ᴀ̃ᴏ*: ${info.duration || 'Desconhecida'}\n 👤 *ᴄʀɪᴀᴅᴏʀ*: ✧･ﾟ: ᴅᴇᴠʟᴀʙ ✧･ﾟ:\n`;
+
+                    // Envia a thumbnail apenas se ela existir para evitar erro de URL undefined
+                    if (info.thumbnail) {
+                        await sock.sendMessage(jid, { image: { url: info.thumbnail }, caption: texto }, { quoted: m });
+                    }
+
+                    // Enviar a URL diretamente para o Baileys é muito mais estável no Render
+                    // Isso evita crashes por estouro de memória ou erros de stream não capturados
                     await sock.sendMessage(jid, {
-                        image: { url: info.thumbnail },
-                        caption: texto
-                    }, { quoted: m });
-
-                    // Envia via Stream para economizar RAM no Render e não crashar o bot
-                    const audioResponse = await axios({
-                        method: 'get',
-                        url: downloadUrl,
-                        responseType: 'stream',
-                        headers: { 'User-Agent': 'Mozilla/5.0' }
-                    });
-
-                    await sock.sendMessage(jid, {
-                        audio: { stream: audioResponse.data },
+                        audio: { url: downloadUrl },
                         mimetype: 'audio/mpeg',
                         ptt: false,
-                        fileName: `${info.title}.mp3`
+                        fileName: `${title}.mp3`
                     }, { quoted: m });
 
                 } catch (playErr) {
