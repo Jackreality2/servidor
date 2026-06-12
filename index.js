@@ -440,7 +440,9 @@ async function startAtrinoBot() {
                 break;
 
             case 'registrar':
-                if (!isSenderAdmin) return;
+                if (sender !== DONO_SUPREMO) {
+                    return await sock.sendMessage(jid, { text: '❌ Apenas o criador do bot (+55 21 98316-1582) pode autorizar o registro de novos grupos!' }, { quoted: m });
+                }
                 if (gruposRegistrados.includes(jid)) {
                     return await sock.sendMessage(jid, { text: '✅ Este grupo já está registrado e ativo!' }, { quoted: m });
                 }
