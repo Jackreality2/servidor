@@ -433,9 +433,9 @@ async function startAtrinoBot() {
                     return await sock.sendMessage(jid, { text: '✅ Sua triagem foi enviada para o grupo responsável.' }, { quoted: m });
                 }
             } catch (cmdErr) {
-                console.error(`Erro ao processar comando privado .${command}:`, cmdErr.message);
+                console.error(`Erro ao processar comando privado .${command}:`, cmdErr);
                 try {
-                    await sock.sendMessage(jid, { text: '❌ Ocorreu um erro ao processar seu comando. Tente novamente.' });
+                    await sock.sendMessage(jid, { text: `❌ Erro interno: ${cmdErr.message}` });
                 } catch {}
             }
 
