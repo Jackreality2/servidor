@@ -41,6 +41,7 @@ let gruposRegistrados = [];
 let senhaRegistro = null;
 let grupoTriagemAtivo = null;
 const sessoesTriagem = {};
+const triagensFinalizadas = new Set(); // rastreia quem já finalizou triagem
 
 // --- FUNÇÕES DE SINCRONIZAÇÃO GITHUB ---
 async function syncEstadoBotToGithub() {
@@ -383,7 +384,11 @@ async function startAtrinoBot() {
             try {
                 if (command === 'triagem') {
                     if (!grupoTriagemAtivo) {
-                        return await sock.sendMessage(jid, { text: '⚠️ Nenhum grupo ativou a triagem no momento.' }, { quoted: m });
+                        return await sock.sendMessage(jid, { text: '⚠️ Nenhum grupo ativou a triagem no momento.' });
+                    }
+
+                    if (triagensFinalizadas.has(sender)) {
+                        return await sock.sendMessage(jid, { text: '❌ Você já realizou sua triagem. Não é permitido enviar mais de uma vez.' });
                     }
 
                     if (!sessoesTriagem[sender]) {
@@ -452,6 +457,7 @@ async function startAtrinoBot() {
                     }
 
                     delete sessoesTriagem[sender];
+                    triagensFinalizadas.add(sender);
                     return await sock.sendMessage(jid, { text: '✅ Sua triagem foi enviada para o grupo responsável.' });
                 }
             } catch (cmdErr) {
@@ -594,6 +600,7 @@ async function startAtrinoBot() {
 │ ➥ .notificar - Avisos de entrada
 │ ➥ .naonotificar - Silenciar avisos
 │ ➥ .ativar_triagem - Ativar recebimento de triagens
+│ ➥ .desativar_triagem - Desativar recebimento de triagens
 │ ➥ .tornaadm @user - Dar Admin
 │ ➥ .totag - Marcar o grupo
 │ ➥ .adv @user - Dar advertência
@@ -614,8 +621,19 @@ async function startAtrinoBot() {
             case 'ativar_triagem':
                 if (!isSenderAdmin) return;
                 grupoTriagemAtivo = jid;
+                triagensFinalizadas.clear(); // reseta o controle de 1x ao reativar
                 await syncEstadoBotToGithub();
                 await sock.sendMessage(jid, { text: '✅ Triagem ativada para este grupo. Quando alguém enviar .triagem no privado, as informações serão enviadas aqui.' }, { quoted: m });
+                break;
+
+            case 'desativar_triagem':
+                if (!isSenderAdmin) return;
+                if (grupoTriagemAtivo !== jid) {
+                    return await sock.sendMessage(jid, { text: '⚠️ A triagem não está ativa neste grupo.' }, { quoted: m });
+                }
+                grupoTriagemAtivo = null;
+                await syncEstadoBotToGithub();
+                await sock.sendMessage(jid, { text: '🔒 Triagem desativada. O bot não aceitará novas triagens até que seja reativada com .ativar_triagem.' }, { quoted: m });
                 break;
 
             case 'registrar':
