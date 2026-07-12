@@ -367,51 +367,76 @@ async function startAtrinoBot() {
             const args = body.slice(1).trim().split(/ +/);
             const command = args.shift().toLowerCase();
 
-            if (command === 'triagem') {
-                if (!grupoTriagemAtivo) {
-                    return await sock.sendMessage(jid, { text: '⚠️ Nenhum grupo ativou a triagem no momento.' }, { quoted: m });
-                }
+            try {
+                if (command === 'triagem') {
+                    if (!grupoTriagemAtivo) {
+                        return await sock.sendMessage(jid, { text: '⚠️ Nenhum grupo ativou a triagem no momento.' }, { quoted: m });
+                    }
 
-                if (!sessoesTriagem[sender]) {
-                    sessoesTriagem[sender] = criarSessaoTriagem(sender, grupoTriagemAtivo);
-                    await sock.sendMessage(grupoTriagemAtivo, {
-                        text: `📋 Nova triagem iniciada por @${sender.split('@')[0]}\n📱 Número: ${sender.split('@')[0]}`,
-                        mentions: [sender]
+                    if (!sessoesTriagem[sender]) {
+                        sessoesTriagem[sender] = criarSessaoTriagem(sender, grupoTriagemAtivo);
+                        try {
+                            await sock.sendMessage(grupoTriagemAtivo, {
+                                text: `📋 Nova triagem iniciada por @${sender.split('@')[0]}\n📱 Número: ${sender.split('@')[0]}`,
+                                mentions: [sender]
+                            });
+                        } catch (notifyErr) {
+                            console.error('Erro ao notificar grupo sobre nova triagem:', notifyErr.message);
+                        }
+                    }
+
+                    return await sock.sendMessage(jid, {
+                        text: 'Para fazer sua triagem você deve mandar print dos seus personagens contendo as contas de email deles, e mande para mim 2 audios ou 1 dos seus personagens e no final diga .finalizar',
+                        quoted: m
                     });
                 }
 
-                return await sock.sendMessage(jid, {
-                    text: 'Para fazer sua triagem você deve mandar print dos seus personagens contendo as contas de email deles, e mande para mim 2 audios ou 1 dos seus personagens e no final diga .finalizar',
-                    quoted: m
-                });
-            }
+                if (command === 'finalizar') {
+                    const sessao = sessoesTriagem[sender];
+                    if (!sessao) {
+                        return await sock.sendMessage(jid, { text: '⚠️ Você ainda não iniciou uma triagem. Envie .triagem primeiro.' }, { quoted: m });
+                    }
 
-            if (command === 'finalizar') {
-                const sessao = sessoesTriagem[sender];
-                if (!sessao) {
-                    return await sock.sendMessage(jid, { text: '⚠️ Você ainda não iniciou uma triagem. Envie .triagem primeiro.' }, { quoted: m });
-                }
+                    if (!grupoTriagemAtivo) {
+                        delete sessoesTriagem[sender];
+                        return await sock.sendMessage(jid, { text: '⚠️ Nenhum grupo está recebendo triagens no momento.' }, { quoted: m });
+                    }
 
-                if (!grupoTriagemAtivo) {
+                    try {
+                        await sock.sendMessage(grupoTriagemAtivo, {
+                            text: `📋 *TRIAGEM FINALIZADA*\n\n👤 Usuário: @${sender.split('@')[0]}\n📱 Número: ${sender.split('@')[0]}\n\n${montarResumoTriagem(sessao)}`,
+                            mentions: [sender]
+                        });
+
+                        for (const imageBuffer of sessao.imagens) {
+                            try {
+                                await sock.sendMessage(grupoTriagemAtivo, { image: imageBuffer, caption: `🖼️ Print enviado por @${sender.split('@')[0]}`, mentions: [sender] });
+                            } catch (imgErr) {
+                                console.error('Erro ao enviar imagem da triagem:', imgErr.message);
+                            }
+                        }
+
+                        for (const audioBuffer of sessao.audios) {
+                            try {
+                                await sock.sendMessage(grupoTriagemAtivo, { audio: audioBuffer, mimetype: 'audio/mpeg', ptt: false });
+                            } catch (audErr) {
+                                console.error('Erro ao enviar áudio da triagem:', audErr.message);
+                            }
+                        }
+                    } catch (finalErr) {
+                        console.error('Erro ao enviar triagem para o grupo:', finalErr.message);
+                        delete sessoesTriagem[sender];
+                        return await sock.sendMessage(jid, { text: '❌ Ocorreu um erro ao enviar sua triagem. Tente novamente.' }, { quoted: m });
+                    }
+
                     delete sessoesTriagem[sender];
-                    return await sock.sendMessage(jid, { text: '⚠️ Nenhum grupo está recebendo triagens no momento.' }, { quoted: m });
+                    return await sock.sendMessage(jid, { text: '✅ Sua triagem foi enviada para o grupo responsável.' }, { quoted: m });
                 }
-
-                await sock.sendMessage(grupoTriagemAtivo, {
-                    text: `📋 *TRIAGEM FINALIZADA*\n\n👤 Usuário: @${sender.split('@')[0]}\n📱 Número: ${sender.split('@')[0]}\n\n${montarResumoTriagem(sessao)}`,
-                    mentions: [sender]
-                });
-
-                for (const imageBuffer of sessao.imagens) {
-                    await sock.sendMessage(grupoTriagemAtivo, { image: imageBuffer, caption: `🖼️ Print enviado por @${sender.split('@')[0]}`, mentions: [sender] });
-                }
-
-                for (const audioBuffer of sessao.audios) {
-                    await sock.sendMessage(grupoTriagemAtivo, { audio: audioBuffer, mimetype: 'audio/mpeg', ptt: false });
-                }
-
-                delete sessoesTriagem[sender];
-                return await sock.sendMessage(jid, { text: '✅ Sua triagem foi enviada para o grupo responsável.' }, { quoted: m });
+            } catch (cmdErr) {
+                console.error(`Erro ao processar comando privado .${command}:`, cmdErr.message);
+                try {
+                    await sock.sendMessage(jid, { text: '❌ Ocorreu um erro ao processar seu comando. Tente novamente.' });
+                } catch {}
             }
 
             return;
@@ -1127,3 +1152,11 @@ async function startAtrinoBot() {
 }
 
 startAtrinoBot();
+
+process.on('uncaughtException', (err) => {
+    console.error('❌ Exceção não capturada (processo mantido ativo):', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('❌ Promise rejeitada não tratada (processo mantido ativo):', reason?.message || reason);
+});
