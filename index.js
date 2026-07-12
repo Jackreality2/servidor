@@ -7,6 +7,7 @@ const cron = require('node-cron');
 const http = require('http');
 const axios = require('axios');
 const fs = require('fs');
+const { criarSessaoTriagem, adicionarMidiaTriagem, montarResumoTriagem } = require('./triagem');
 
 // --- CORREÇÃO DEFINITIVA DO FFMPEG PARA O RENDER ---
 const ffmpegPath = require('ffmpeg-static');
@@ -38,24 +39,32 @@ let precoFigurinha = 2;
 let ultimaInteracao = {};
 let gruposRegistrados = [];
 let senhaRegistro = null;
+let grupoTriagemAtivo = null;
+const sessoesTriagem = {};
 
 // --- FUNÇÕES DE SINCRONIZAÇÃO GITHUB ---
-async function syncGruposToGithub(grupos) {
-    const config = { 
-        token: process.env.GITHUB_TOKEN, 
-        owner: 'Jackreality2', 
-        repo: 'servidor', 
-        path: 'grupos_registrados.json' 
+async function syncEstadoBotToGithub() {
+    const config = {
+        token: process.env.GITHUB_TOKEN,
+        owner: 'Jackreality2',
+        repo: 'servidor',
+        path: 'bot_state.json'
     };
     if (!config.token || !config.owner || !config.repo) return console.log('⚠️ Configurações do GitHub ausentes.');
-    
-    const headers = { 
+
+    const headers = {
         'Authorization': `Bearer ${config.token}`,
         'Accept': 'application/vnd.github.v3+json',
         'User-Agent': 'AtrinoBot-Sync'
     };
 
     try {
+        const payload = {
+            gruposRegistrados,
+            grupoTriagemAtivo,
+            atualizadoEm: new Date().toISOString()
+        };
+
         const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.path}`;
         let sha;
         try {
@@ -64,34 +73,43 @@ async function syncGruposToGithub(grupos) {
         } catch (e) {}
 
         await axios.put(url, {
-            message: `Update registered groups: ${new Date().toISOString()}`,
-            content: Buffer.from(JSON.stringify(grupos, null, 2)).toString('base64'),
+            message: `Update bot state: ${new Date().toISOString()}`,
+            content: Buffer.from(JSON.stringify(payload, null, 2)).toString('base64'),
             sha: sha
         }, { headers });
-        
-        console.log(`✅ Grupos sincronizados com GitHub. Total: ${grupos.length}`);
-    } catch (err) { 
-        console.error('❌ Erro GitHub:', err.response?.data?.message || err.message); 
+
+        console.log('✅ Estado do bot sincronizado com GitHub.');
+    } catch (err) {
+        console.error('❌ Erro GitHub:', err.response?.data?.message || err.message);
     }
 }
 
-async function loadGruposFromGithub() {
-    const config = { 
-        token: process.env.GITHUB_TOKEN, 
-        owner: 'Jackreality2', 
-        repo: 'servidor', 
-        path: 'grupos_registrados.json' 
+async function syncGruposToGithub(grupos) {
+    gruposRegistrados = Array.isArray(grupos) ? grupos : gruposRegistrados;
+    await syncEstadoBotToGithub();
+}
+
+async function loadEstadoBotFromGithub() {
+    const config = {
+        token: process.env.GITHUB_TOKEN,
+        owner: 'Jackreality2',
+        repo: 'servidor',
+        path: 'bot_state.json'
     };
     if (!config.token || !config.owner || !config.repo) return;
-    
+
     const headers = { 'Authorization': `Bearer ${config.token}`, 'User-Agent': 'AtrinoBot-Sync' };
 
     try {
         const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.path}`;
         const res = await axios.get(url, { headers });
-        gruposRegistrados = JSON.parse(Buffer.from(res.data.content, 'base64').toString('utf-8'));
-        console.log('✅ Grupos carregados do GitHub.');
-    } catch (e) { console.log('ℹ️ Nenhum registro encontrado no GitHub, iniciando limpo.'); }
+        const payload = JSON.parse(Buffer.from(res.data.content, 'base64').toString('utf-8'));
+        gruposRegistrados = Array.isArray(payload.gruposRegistrados) ? payload.gruposRegistrados : [];
+        grupoTriagemAtivo = payload.grupoTriagemAtivo || null;
+        console.log('✅ Estado do bot carregado do GitHub.');
+    } catch (e) {
+        console.log('ℹ️ Nenhum estado salvo no GitHub, iniciando limpo.');
+    }
 }
 
 // --- PALAVRAS PARA ANAGRAMA (Simulando IA) ---
@@ -184,8 +202,27 @@ http.createServer((req, res) => {
     }, 60000); // 1 minuto
 });
 
+async function baixarMidiaDoMensagem(sock, message) {
+    if (message.imageMessage) {
+        const stream = await downloadContentFromMessage(message.imageMessage, 'image');
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+        return { tipo: 'image', buffer };
+    }
+
+    const audioMessage = message.audioMessage || message.ptt;
+    if (audioMessage) {
+        const stream = await downloadContentFromMessage(audioMessage, 'audio');
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+        return { tipo: 'audio', buffer };
+    }
+
+    return null;
+}
+
 async function startAtrinoBot() {
-    await loadGruposFromGithub();
+    await loadEstadoBotFromGithub();
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
     
     if (state.creds && state.creds.signedRegistrationInfo) {
@@ -287,8 +324,18 @@ async function startAtrinoBot() {
         if (!m.message || m.key.fromMe) return;
 
         const jid = m.key.remoteJid;
-        if (!jid.endsWith('@g.us')) return; 
+        const isGroup = jid.endsWith('@g.us');
         const sender = m.key.participant || m.key.remoteJid;
+
+        if (!isGroup && !m.message.conversation && !m.message.extendedTextMessage?.text) {
+            const sessao = sessoesTriagem[sender];
+            if (sessao && grupoTriagemAtivo) {
+                const media = await baixarMidiaDoMensagem(sock, m.message);
+                if (media) {
+                    adicionarMidiaTriagem(sessao, media.tipo, media.buffer);
+                }
+            }
+        }
 
         // --- SISTEMA DE RESET POR INATIVIDADE (5 DIAS) ---
         const agoraInteracao = Date.now();
@@ -315,6 +362,62 @@ async function startAtrinoBot() {
         }
         
         const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || "");
+
+        if (!isGroup && body.startsWith('.')) {
+            const args = body.slice(1).trim().split(/ +/);
+            const command = args.shift().toLowerCase();
+
+            if (command === 'triagem') {
+                if (!grupoTriagemAtivo) {
+                    return await sock.sendMessage(jid, { text: '⚠️ Nenhum grupo ativou a triagem no momento.' }, { quoted: m });
+                }
+
+                if (!sessoesTriagem[sender]) {
+                    sessoesTriagem[sender] = criarSessaoTriagem(sender, grupoTriagemAtivo);
+                    await sock.sendMessage(grupoTriagemAtivo, {
+                        text: `📋 Nova triagem iniciada por @${sender.split('@')[0]}\n📱 Número: ${sender.split('@')[0]}`,
+                        mentions: [sender]
+                    });
+                }
+
+                return await sock.sendMessage(jid, {
+                    text: 'Para fazer sua triagem você deve mandar print dos seus personagens contendo as contas de email deles, e mande para mim 2 audios ou 1 dos seus personagens e no final diga .finalizar',
+                    quoted: m
+                });
+            }
+
+            if (command === 'finalizar') {
+                const sessao = sessoesTriagem[sender];
+                if (!sessao) {
+                    return await sock.sendMessage(jid, { text: '⚠️ Você ainda não iniciou uma triagem. Envie .triagem primeiro.' }, { quoted: m });
+                }
+
+                if (!grupoTriagemAtivo) {
+                    delete sessoesTriagem[sender];
+                    return await sock.sendMessage(jid, { text: '⚠️ Nenhum grupo está recebendo triagens no momento.' }, { quoted: m });
+                }
+
+                await sock.sendMessage(grupoTriagemAtivo, {
+                    text: `📋 *TRIAGEM FINALIZADA*\n\n👤 Usuário: @${sender.split('@')[0]}\n📱 Número: ${sender.split('@')[0]}\n\n${montarResumoTriagem(sessao)}`,
+                    mentions: [sender]
+                });
+
+                for (const imageBuffer of sessao.imagens) {
+                    await sock.sendMessage(grupoTriagemAtivo, { image: imageBuffer, caption: `🖼️ Print enviado por @${sender.split('@')[0]}`, mentions: [sender] });
+                }
+
+                for (const audioBuffer of sessao.audios) {
+                    await sock.sendMessage(grupoTriagemAtivo, { audio: audioBuffer, mimetype: 'audio/mpeg', ptt: false });
+                }
+
+                delete sessoesTriagem[sender];
+                return await sock.sendMessage(jid, { text: '✅ Sua triagem foi enviada para o grupo responsável.' }, { quoted: m });
+            }
+
+            return;
+        }
+
+        if (!isGroup) return;
 
         // --- VERIFICAÇÃO DE RESPOSTA DO ANAGRAMA ---
         if (anagramaGame.ativo && anagramaGame.jid === jid && body.toLowerCase() === anagramaGame.palavra) {
@@ -443,6 +546,7 @@ async function startAtrinoBot() {
 │ ➥ .desativa_anagrama - Para jogo
 │ ➥ .notificar - Avisos de entrada
 │ ➥ .naonotificar - Silenciar avisos
+│ ➥ .ativar_triagem - Ativar recebimento de triagens
 │ ➥ .tornaadm @user - Dar Admin
 │ ➥ .totag - Marcar o grupo
 │ ➥ .adv @user - Dar advertência
@@ -460,6 +564,13 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: menu + logComando, mentions: [sender] }, { quoted: m });
                 break;
 
+            case 'ativar_triagem':
+                if (!isSenderAdmin) return;
+                grupoTriagemAtivo = jid;
+                await syncEstadoBotToGithub();
+                await sock.sendMessage(jid, { text: '✅ Triagem ativada para este grupo. Quando alguém enviar .triagem no privado, as informações serão enviadas aqui.' }, { quoted: m });
+                break;
+
             case 'registrar':
                 if (gruposRegistrados.includes(jid)) {
                     return await sock.sendMessage(jid, { text: '✅ Este grupo já está registrado e ativo!' }, { quoted: m });
@@ -475,7 +586,7 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: '⏳ *Processando registro e sincronizando com GitHub...*' }, { quoted: m });
                 gruposRegistrados.push(jid);
                 
-                await syncGruposToGithub(gruposRegistrados);
+                await syncEstadoBotToGithub();
                 senhaRegistro = null; // Invalida a senha após o primeiro uso bem-sucedido
                 await sock.sendMessage(jid, { text: '🚀 *GRUPO REGISTRADO COM SUCESSO!*\n\nO bot agora está oficialmente ativo neste salão e salvo na nuvem.' }, { quoted: m });
                 break;
@@ -494,7 +605,8 @@ async function startAtrinoBot() {
 
                 // Remove o JID da lista e sincroniza com o GitHub
                 gruposRegistrados = gruposRegistrados.filter(id => id !== jid);
-                await syncGruposToGithub(gruposRegistrados);
+                if (grupoTriagemAtivo === jid) grupoTriagemAtivo = null;
+                await syncEstadoBotToGithub();
                 senhaRegistro = null; // Invalida a senha
 
                 // Agenda a saída do grupo
