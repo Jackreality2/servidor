@@ -50,6 +50,10 @@ let contadorTicket = 0;              // incrementa a cada triagem finalizada
 // filaTriagem: [ { ticket, senderJid, numeroExibir, status: 'aguardando'|'aprovado'|'reprovado' } ]
 const filaTriagem = [];
 
+// --- SISTEMA DE ALERTA TIKTOK ---
+// alertasTikTok: { [grupoJid]: { username, ultimoVideoId } }
+const alertasTikTok = {};
+
 // --- FUNÇÕES DE SINCRONIZAÇÃO GITHUB ---
 async function syncEstadoBotToGithub() {
     const config = {
@@ -135,6 +139,45 @@ function gerarAnagrama() {
 
 // --- PORTA DINÂMICA EXIGIDA PELO RENDER ---
 const PORT = parseInt(process.env.PORT, 10) || 7860;
+
+// --- SISTEMA DE ALERTA TIKTOK (via RSS do RSSHub) ---
+// Usa https://rsshub.app/tiktok/user/@username — sem API key, gratuito
+async function checarNovosTikToks(sockInstance) {
+    for (const [grupoJid, alerta] of Object.entries(alertasTikTok)) {
+        try {
+            const rssUrl = `https://rsshub.app/tiktok/user/@${alerta.username}`;
+            const res = await axios.get(rssUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AtrinoBot/1.0)' },
+                timeout: 10000
+            });
+
+            // Extrai o primeiro <item> do XML (vídeo mais recente)
+            const itemMatch = res.data.match(/<item>([\s\S]*?)<\/item>/);
+            if (!itemMatch) continue;
+
+            const itemXml = itemMatch[1];
+
+            const tituloMatch = itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || itemXml.match(/<title>(.*?)<\/title>/);
+            const linkMatch   = itemXml.match(/<link>(.*?)<\/link>/);
+            const guidMatch   = itemXml.match(/<guid[^>]*>(.*?)<\/guid>/);
+
+            const titulo = tituloMatch ? tituloMatch[1].trim() : 'Sem título';
+            const link   = linkMatch   ? linkMatch[1].trim()   : `https://www.tiktok.com/@${alerta.username}`;
+            const videoId = guidMatch  ? guidMatch[1].trim()   : link;
+
+            // Só envia se for um vídeo novo (ID diferente do último visto)
+            if (videoId && videoId !== alerta.ultimoVideoId) {
+                alerta.ultimoVideoId = videoId;
+                await sockInstance.sendMessage(grupoJid, {
+                    text: `🎵 *NOVO VÍDEO NO TIKTOK!*\n\n👤 Perfil: @${alerta.username}\n📹 *${titulo}*\n\n🔗 ${link}`
+                });
+            }
+        } catch (err) {
+            // Falha silenciosa — rede instável ou perfil não encontrado
+            console.error(`[TikTok Alert] Erro ao checar @${alertasTikTok[grupoJid]?.username}:`, err.message);
+        }
+    }
+}
 
 // --- SERVIDOR WEB DE MONITORAMENTO E QR CODE ---
 http.createServer((req, res) => {
@@ -299,6 +342,13 @@ async function startAtrinoBot() {
             await sock.sendMessage(ID_DO_GRUPO, { text: textoAberto });
         } catch (err) {}
     }, { timezone: "America/Sao_Paulo" });
+
+    // --- CRON DE ALERTA TIKTOK (a cada 5 minutos) ---
+    cron.schedule('*/5 * * * *', async () => {
+        if (Object.keys(alertasTikTok).length > 0) {
+            await checarNovosTikToks(sock);
+        }
+    });
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -634,6 +684,8 @@ async function startAtrinoBot() {
 │ ➥ .registrar_link <link> - Link do grupo destino
 │ ➥ .aprovar <ticket> - Aprovar triagem pelo ticket
 │ ➥ .reprovar <ticket> - Reprovar triagem pelo ticket
+│ ➥ .alert_tiktok @user - Alertar novo vídeo do TikTok
+│ ➥ .remover_alert_tiktok - Remover alerta TikTok
 │ ➥ .tornaadm @user - Dar Admin
 │ ➥ .totag - Marcar o grupo
 │ ➥ .adv @user - Dar advertência
@@ -689,6 +741,49 @@ async function startAtrinoBot() {
                 if (!args[0]) return sock.sendMessage(jid, { text: '❌ Informe o link! Uso: *.registrar_link https://chat.whatsapp.com/...*' }, { quoted: m });
                 linkGrupoTriagem = args[0].trim();
                 await sock.sendMessage(jid, { text: `✅ Link do grupo registrado com sucesso!\n\n🔗 ${linkGrupoTriagem}\n\nEste link será enviado automaticamente para quem for *aprovado* na triagem.` }, { quoted: m });
+                break;
+
+            case 'alert_tiktok': {
+                if (!isSenderAdmin) return;
+                const inputTk = args[0];
+                if (!inputTk) return sock.sendMessage(jid, { text: '❌ Informe o @ do perfil!\nUso: *.alert_tiktok @nomeusuario* ou *.alert_tiktok nomeusuario*' }, { quoted: m });
+
+                // Aceita com ou sem @
+                const usernameTk = inputTk.replace(/^@/, '').trim();
+
+                // Verifica se o perfil existe no RSSHub antes de registrar
+                await sock.sendMessage(jid, { text: `⏳ Verificando perfil @${usernameTk}...` }, { quoted: m });
+                try {
+                    const testRes = await axios.get(`https://rsshub.app/tiktok/user/@${usernameTk}`, {
+                        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AtrinoBot/1.0)' },
+                        timeout: 12000
+                    });
+
+                    // Extrai o ID do vídeo mais recente para não alertar de cara
+                    let primeiroId = null;
+                    const guidMatch = testRes.data.match(/<guid[^>]*>(.*?)<\/guid>/);
+                    if (guidMatch) primeiroId = guidMatch[1].trim();
+
+                    alertasTikTok[jid] = { username: usernameTk, ultimoVideoId: primeiroId };
+                    await sock.sendMessage(jid, {
+                        text: `✅ *Alerta TikTok ativado!*\n\n👤 Perfil monitorado: @${usernameTk}\n⏱️ Verificação: a cada 5 minutos\n\nQuando sair um vídeo novo, o bot avisará aqui neste grupo.\n\nPara remover: *.remover_alert_tiktok*`
+                    }, { quoted: m });
+                } catch (tkErr) {
+                    await sock.sendMessage(jid, {
+                        text: `❌ Não foi possível acessar o perfil *@${usernameTk}*.\n\nVerifique se o @ está correto e tente novamente.`
+                    }, { quoted: m });
+                }
+                break;
+            }
+
+            case 'remover_alert_tiktok':
+                if (!isSenderAdmin) return;
+                if (!alertasTikTok[jid]) {
+                    return sock.sendMessage(jid, { text: '⚠️ Nenhum alerta TikTok ativo neste grupo.' }, { quoted: m });
+                }
+                const usernameRemovido = alertasTikTok[jid].username;
+                delete alertasTikTok[jid];
+                await sock.sendMessage(jid, { text: `🔕 Alerta do perfil *@${usernameRemovido}* removido.` }, { quoted: m });
                 break;
 
             case 'aprovar': {
