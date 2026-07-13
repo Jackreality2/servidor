@@ -705,6 +705,7 @@ async function startAtrinoBot() {
 │ ➥ .alert_tiktok @user - Alertar novo vídeo do TikTok
 │ ➥ .remover_alert_tiktok - Remover alerta TikTok
 │ ➥ .tornaadm @user - Dar Admin
+│ ➥ .rebaixar @user - Remover Admin
 │ ➥ .totag - Marcar o grupo
 │ ➥ .adv @user - Dar advertência
 │ ➥ .unadv @user - Remover adv
@@ -1142,6 +1143,26 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: `✅ @${userToAdmin.split('@')[0]} agora é Admin!`, mentions: [userToAdmin] });
                 break;
 
+            case 'rebaixar':
+                if (!isSenderAdmin) return;
+                const userRebaixar = getMention();
+                if (!userRebaixar) return sock.sendMessage(jid, { text: '❌ Mencione o administrador que deseja rebaixar!' }, { quoted: m });
+                try {
+                    const metaRebaixar = await sock.groupMetadata(jid);
+                    const isAdminRebaixar = metaRebaixar.participants
+                        .filter(p => p.admin !== null)
+                        .map(p => p.id)
+                        .includes(userRebaixar);
+                    if (!isAdminRebaixar) {
+                        return sock.sendMessage(jid, { text: `⚠️ @${userRebaixar.split('@')[0]} não é administrador.`, mentions: [userRebaixar] }, { quoted: m });
+                    }
+                    await sock.groupParticipantsUpdate(jid, [userRebaixar], "demote");
+                    await sock.sendMessage(jid, { text: `🔻 @${userRebaixar.split('@')[0]} foi rebaixado e não é mais administrador.`, mentions: [userRebaixar] }, { quoted: m });
+                } catch (err) {
+                    await sock.sendMessage(jid, { text: '❌ Erro ao rebaixar. Verifique se sou administrador do grupo.' }, { quoted: m });
+                }
+                break;
+
             case 'relatorio':
                 if (!isSenderAdmin) return;
                 // Reação inicial com emoji de positivo
@@ -1203,8 +1224,22 @@ async function startAtrinoBot() {
                 break;
 
             case 'adv':
-                if (!isSenderAdmin || !getMention()) return;
+                if (!isSenderAdmin) return;
                 const uAdv = getMention();
+                if (!uAdv) return sock.sendMessage(jid, { text: '❌ Mencione o usuário!' }, { quoted: m });
+
+                // Bloqueia advertência em administradores
+                try {
+                    const metaAdv = await sock.groupMetadata(jid);
+                    const isTargetAdmin = metaAdv.participants
+                        .filter(p => p.admin !== null)
+                        .map(p => p.id)
+                        .includes(uAdv);
+                    if (isTargetAdmin) {
+                        return sock.sendMessage(jid, { text: `❌ Não é possível advertir um administrador.`, mentions: [uAdv] }, { quoted: m });
+                    }
+                } catch (e) {}
+
                 advertencias[uAdv] = (advertencias[uAdv] || 0) + 1;
                 if (advertencias[uAdv] >= 3) {
                     await sock.sendMessage(jid, { text: `🚫 @${uAdv.split('@')[0]} atingiu 3/3 e foi removido.`, mentions: [uAdv] });
@@ -1216,11 +1251,18 @@ async function startAtrinoBot() {
                 break;
 
             case 'unadv':
-                if (!isSenderAdmin || !getMention()) return;
-                if (advertencias[getMention()]) {
-                    advertencias[getMention()]--;
-                    await sock.sendMessage(jid, { text: `✅ Advertência removida.`, mentions: [getMention()] });
+                if (!isSenderAdmin) return;
+                const userUnadv = getMention();
+                if (!userUnadv) return sock.sendMessage(jid, { text: '❌ Mencione o usuário!' }, { quoted: m });
+                if (!advertencias[userUnadv] || advertencias[userUnadv] <= 0) {
+                    return sock.sendMessage(jid, { text: `⚠️ @${userUnadv.split('@')[0]} não possui advertências.`, mentions: [userUnadv] }, { quoted: m });
                 }
+                advertencias[userUnadv]--;
+                if (advertencias[userUnadv] === 0) delete advertencias[userUnadv];
+                await sock.sendMessage(jid, {
+                    text: `✅ Advertência removida de @${userUnadv.split('@')[0]}.\n⚠️ Advertências restantes: ${advertencias[userUnadv] || 0}/3`,
+                    mentions: [userUnadv]
+                }, { quoted: m });
                 break;
 
             case 'totag':
