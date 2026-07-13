@@ -43,6 +43,13 @@ let grupoTriagemAtivo = null;
 const sessoesTriagem = {};
 const triagensFinalizadas = new Set(); // rastreia quem já finalizou triagem
 
+// --- SISTEMA DE FILA ---
+let filaAtiva = false;               // .ativar_fila / .desativar_fila
+let linkGrupoTriagem = null;         // .registrar_link
+let contadorTicket = 0;              // incrementa a cada triagem finalizada
+// filaTriagem: [ { ticket, senderJid, numeroExibir, status: 'aguardando'|'aprovado'|'reprovado' } ]
+const filaTriagem = [];
+
 // --- FUNÇÕES DE SINCRONIZAÇÃO GITHUB ---
 async function syncEstadoBotToGithub() {
     const config = {
@@ -458,7 +465,28 @@ async function startAtrinoBot() {
 
                     delete sessoesTriagem[sender];
                     triagensFinalizadas.add(sender);
-                    return await sock.sendMessage(jid, { text: '✅ Sua triagem foi enviada para o grupo responsável.' });
+
+                    // --- SISTEMA DE FILA ---
+                    if (filaAtiva) {
+                        contadorTicket++;
+                        const ticket = contadorTicket;
+                        const posicao = filaTriagem.filter(e => e.status === 'aguardando').length + 1;
+                        filaTriagem.push({ ticket, senderJid: sender, numeroExibir, status: 'aguardando' });
+
+                        await sock.sendMessage(sender, {
+                            text: `✅ Triagem enviada com sucesso!\n\n🎫 *Seu ticket: #${ticket}*\n📊 Posição na fila: *${posicao}º*\n\n⏳ Aguarde. Você será notificado(a) assim que sua triagem for analisada.`
+                        });
+
+                        // Avisa o grupo sobre o novo ticket na fila
+                        try {
+                            await sock.sendMessage(grupoTriagemAtivo, {
+                                text: `🎫 *Ticket #${ticket} adicionado à fila*\n📱 Número: ${numeroExibir}\n📊 Posição: ${posicao}º\n\nUse *.aprovar ${ticket}* ou *.reprovar ${ticket}* para processar.`
+                            });
+                        } catch {}
+                    } else {
+                        await sock.sendMessage(sender, { text: '✅ Sua triagem foi enviada para o grupo responsável.' });
+                    }
+                    return;
                 }
             } catch (cmdErr) {
                 console.error(`Erro ao processar comando privado .${command}:`, cmdErr);
@@ -601,6 +629,11 @@ async function startAtrinoBot() {
 │ ➥ .naonotificar - Silenciar avisos
 │ ➥ .ativar_triagem - Ativar recebimento de triagens
 │ ➥ .desativar_triagem - Desativar recebimento de triagens
+│ ➥ .ativar_fila - Ativar sistema de fila com tickets
+│ ➥ .desativar_fila - Desativar fila
+│ ➥ .registrar_link <link> - Link do grupo destino
+│ ➥ .aprovar <ticket> - Aprovar triagem pelo ticket
+│ ➥ .reprovar <ticket> - Reprovar triagem pelo ticket
 │ ➥ .tornaadm @user - Dar Admin
 │ ➥ .totag - Marcar o grupo
 │ ➥ .adv @user - Dar advertência
@@ -621,7 +654,7 @@ async function startAtrinoBot() {
             case 'ativar_triagem':
                 if (!isSenderAdmin) return;
                 grupoTriagemAtivo = jid;
-                triagensFinalizadas.clear(); // reseta o controle de 1x ao reativar
+                triagensFinalizadas.clear();
                 await syncEstadoBotToGithub();
                 await sock.sendMessage(jid, { text: '✅ Triagem ativada para este grupo. Quando alguém enviar .triagem no privado, as informações serão enviadas aqui.' }, { quoted: m });
                 break;
@@ -635,6 +668,115 @@ async function startAtrinoBot() {
                 await syncEstadoBotToGithub();
                 await sock.sendMessage(jid, { text: '🔒 Triagem desativada. O bot não aceitará novas triagens até que seja reativada com .ativar_triagem.' }, { quoted: m });
                 break;
+
+            case 'ativar_fila':
+                if (!isSenderAdmin) return;
+                filaAtiva = true;
+                filaTriagem.length = 0;
+                contadorTicket = 0;
+                await sock.sendMessage(jid, { text: '🔢 *FILA ATIVADA!*\n\nCada triagem finalizada receberá um número de ticket.\nUse *.aprovar <número>* ou *.reprovar <número>* para processar.' }, { quoted: m });
+                break;
+
+            case 'desativar_fila':
+                if (!isSenderAdmin) return;
+                filaAtiva = false;
+                filaTriagem.length = 0;
+                await sock.sendMessage(jid, { text: '🔕 Fila desativada. As triagens serão enviadas sem controle de fila.' }, { quoted: m });
+                break;
+
+            case 'registrar_link':
+                if (!isSenderAdmin) return;
+                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Informe o link! Uso: *.registrar_link https://chat.whatsapp.com/...*' }, { quoted: m });
+                linkGrupoTriagem = args[0].trim();
+                await sock.sendMessage(jid, { text: `✅ Link do grupo registrado com sucesso!\n\n🔗 ${linkGrupoTriagem}\n\nEste link será enviado automaticamente para quem for *aprovado* na triagem.` }, { quoted: m });
+                break;
+
+            case 'aprovar': {
+                if (!isSenderAdmin) return;
+                const ticketAprovar = parseInt(args[0]);
+                if (isNaN(ticketAprovar)) return sock.sendMessage(jid, { text: '❌ Informe o número do ticket! Uso: *.aprovar 3*' }, { quoted: m });
+
+                const entradaAprovar = filaTriagem.find(e => e.ticket === ticketAprovar && e.status === 'aguardando');
+                if (!entradaAprovar) return sock.sendMessage(jid, { text: `❌ Ticket #${ticketAprovar} não encontrado ou já processado.` }, { quoted: m });
+
+                entradaAprovar.status = 'aprovado';
+                await sock.sendMessage(jid, { text: `✅ Ticket #${ticketAprovar} *APROVADO*!\n📱 Número: ${entradaAprovar.numeroExibir}` }, { quoted: m });
+
+                // Notifica o usuário no PV
+                try {
+                    let msgAprovado = `🎉 *SUA TRIAGEM FOI APROVADA!*\n\n✅ Ticket: *#${ticketAprovar}*\n📱 Número: ${entradaAprovar.numeroExibir}\n\nParabéns! Você foi aprovado(a).`;
+                    if (linkGrupoTriagem) {
+                        msgAprovado += `\n\n🔗 *Entre no grupo agora:*\n${linkGrupoTriagem}`;
+                    }
+                    await sock.sendMessage(entradaAprovar.senderJid, { text: msgAprovado });
+
+                    // Apaga o histórico do PV após 3 minutos
+                    setTimeout(async () => {
+                        try {
+                            await sock.chatModify({ clear: { messages: [{ id: 'ATRINO_CLEAR', fromMe: false }] } }, entradaAprovar.senderJid);
+                        } catch {}
+                        try {
+                            await sock.sendMessage(entradaAprovar.senderJid, { delete: { remoteJid: entradaAprovar.senderJid, fromMe: true, id: 'placeholder' } });
+                        } catch {}
+                        // Método mais compatível: apagar mensagens enviadas pelo bot
+                        try {
+                            await sock.chatModify({ clear: { before: new Date() } }, entradaAprovar.senderJid);
+                        } catch {}
+                    }, 3 * 60 * 1000);
+                } catch (pvErr) {
+                    console.error('Erro ao notificar aprovado no PV:', pvErr.message);
+                }
+
+                // Atualiza posição dos que ainda aguardam e notifica cada um
+                const aguardando = filaTriagem.filter(e => e.status === 'aguardando');
+                for (let i = 0; i < aguardando.length; i++) {
+                    try {
+                        await sock.sendMessage(aguardando[i].senderJid, {
+                            text: `📊 *ATUALIZAÇÃO DA FILA*\n\nTicket #${aguardando[i].ticket}\nSua posição atual: *${i + 1}º na fila*\n\n⏳ Aguarde, sua triagem será analisada em breve.`
+                        });
+                    } catch {}
+                }
+                break;
+            }
+
+            case 'reprovar': {
+                if (!isSenderAdmin) return;
+                const ticketReprovar = parseInt(args[0]);
+                if (isNaN(ticketReprovar)) return sock.sendMessage(jid, { text: '❌ Informe o número do ticket! Uso: *.reprovar 3*' }, { quoted: m });
+
+                const entradaReprovar = filaTriagem.find(e => e.ticket === ticketReprovar && e.status === 'aguardando');
+                if (!entradaReprovar) return sock.sendMessage(jid, { text: `❌ Ticket #${ticketReprovar} não encontrado ou já processado.` }, { quoted: m });
+
+                entradaReprovar.status = 'reprovado';
+                await sock.sendMessage(jid, { text: `❌ Ticket #${ticketReprovar} *REPROVADO*.\n📱 Número: ${entradaReprovar.numeroExibir}` }, { quoted: m });
+
+                // Notifica o usuário no PV
+                try {
+                    await sock.sendMessage(entradaReprovar.senderJid, {
+                        text: `❌ *SUA TRIAGEM FOI REPROVADA*\n\nTicket: *#${ticketReprovar}*\n📱 Número: ${entradaReprovar.numeroExibir}\n\nInfelizmente sua triagem não foi aprovada desta vez.`
+                    });
+
+                    // Apaga o histórico do PV após 3 minutos
+                    setTimeout(async () => {
+                        try {
+                            await sock.chatModify({ clear: { before: new Date() } }, entradaReprovar.senderJid);
+                        } catch {}
+                    }, 3 * 60 * 1000);
+                } catch (pvErr) {
+                    console.error('Erro ao notificar reprovado no PV:', pvErr.message);
+                }
+
+                // Atualiza posição dos que ainda aguardam
+                const aguardandoRep = filaTriagem.filter(e => e.status === 'aguardando');
+                for (let i = 0; i < aguardandoRep.length; i++) {
+                    try {
+                        await sock.sendMessage(aguardandoRep[i].senderJid, {
+                            text: `📊 *ATUALIZAÇÃO DA FILA*\n\nTicket #${aguardandoRep[i].ticket}\nSua posição atual: *${i + 1}º na fila*\n\n⏳ Aguarde, sua triagem será analisada em breve.`
+                        });
+                    } catch {}
+                }
+                break;
+            }
 
             case 'registrar':
                 if (gruposRegistrados.includes(jid)) {
