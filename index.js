@@ -54,6 +54,44 @@ const filaTriagem = [];
 // alertasTikTok: { [grupoJid]: { username, ultimoVideoId } }
 const alertasTikTok = {};
 
+// Busca o vídeo mais recente de um perfil TikTok público
+async function buscarUltimoVideoTikTok(username) {
+    // Abordagem 1: endpoint web não-autenticado do TikTok
+    const url = `https://www.tiktok.com/@${username}`;
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Referer': 'https://www.tiktok.com/',
+    };
+
+    const res = await axios.get(url, { headers, timeout: 15000 });
+    const html = res.data;
+
+    // O TikTok injeta os dados do perfil num <script id="SIGI_STATE"> em JSON
+    const sigiMatch = html.match(/<script id="SIGI_STATE"[^>]*>([\s\S]*?)<\/script>/);
+    if (!sigiMatch) throw new Error('SIGI_STATE não encontrado');
+
+    const sigi = JSON.parse(sigiMatch[1]);
+
+    // Navega na estrutura do SIGI_STATE para achar os vídeos
+    const itemModule = sigi?.ItemModule || sigi?.itemModule;
+    if (!itemModule) throw new Error('ItemModule não encontrado');
+
+    const videos = Object.values(itemModule);
+    if (!videos.length) throw new Error('Nenhum vídeo encontrado');
+
+    // Ordena por createTime desc e pega o mais recente
+    videos.sort((a, b) => (b.createTime || 0) - (a.createTime || 0));
+    const latest = videos[0];
+
+    return {
+        id: latest.id,
+        titulo: latest.desc || 'Sem título',
+        link: `https://www.tiktok.com/@${username}/video/${latest.id}`
+    };
+}
+
 // --- FUNÇÕES DE SINCRONIZAÇÃO GITHUB ---
 async function syncEstadoBotToGithub() {
     const config = {
@@ -142,39 +180,19 @@ const PORT = parseInt(process.env.PORT, 10) || 7860;
 
 // --- SISTEMA DE ALERTA TIKTOK (via RSS do RSSHub) ---
 // Usa https://rsshub.app/tiktok/user/@username — sem API key, gratuito
+// Verifica todos os alertas cadastrados e notifica se houver vídeo novo
 async function checarNovosTikToks(sockInstance) {
     for (const [grupoJid, alerta] of Object.entries(alertasTikTok)) {
         try {
-            const rssUrl = `https://rsshub.app/tiktok/user/@${alerta.username}`;
-            const res = await axios.get(rssUrl, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AtrinoBot/1.0)' },
-                timeout: 10000
-            });
-
-            // Extrai o primeiro <item> do XML (vídeo mais recente)
-            const itemMatch = res.data.match(/<item>([\s\S]*?)<\/item>/);
-            if (!itemMatch) continue;
-
-            const itemXml = itemMatch[1];
-
-            const tituloMatch = itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || itemXml.match(/<title>(.*?)<\/title>/);
-            const linkMatch   = itemXml.match(/<link>(.*?)<\/link>/);
-            const guidMatch   = itemXml.match(/<guid[^>]*>(.*?)<\/guid>/);
-
-            const titulo = tituloMatch ? tituloMatch[1].trim() : 'Sem título';
-            const link   = linkMatch   ? linkMatch[1].trim()   : `https://www.tiktok.com/@${alerta.username}`;
-            const videoId = guidMatch  ? guidMatch[1].trim()   : link;
-
-            // Só envia se for um vídeo novo (ID diferente do último visto)
-            if (videoId && videoId !== alerta.ultimoVideoId) {
-                alerta.ultimoVideoId = videoId;
+            const video = await buscarUltimoVideoTikTok(alerta.username);
+            if (video.id && video.id !== alerta.ultimoVideoId) {
+                alerta.ultimoVideoId = video.id;
                 await sockInstance.sendMessage(grupoJid, {
-                    text: `🎵 *NOVO VÍDEO NO TIKTOK!*\n\n👤 Perfil: @${alerta.username}\n📹 *${titulo}*\n\n🔗 ${link}`
+                    text: `🎵 *NOVO VÍDEO NO TIKTOK!*\n\n👤 Perfil: @${alerta.username}\n📹 *${video.titulo}*\n\n🔗 ${video.link}`
                 });
             }
         } catch (err) {
-            // Falha silenciosa — rede instável ou perfil não encontrado
-            console.error(`[TikTok Alert] Erro ao checar @${alertasTikTok[grupoJid]?.username}:`, err.message);
+            console.error(`[TikTok Alert] Erro ao checar @${alerta.username}:`, err.message);
         }
     }
 }
@@ -748,29 +766,22 @@ async function startAtrinoBot() {
                 const inputTk = args[0];
                 if (!inputTk) return sock.sendMessage(jid, { text: '❌ Informe o @ do perfil!\nUso: *.alert_tiktok @nomeusuario* ou *.alert_tiktok nomeusuario*' }, { quoted: m });
 
-                // Aceita com ou sem @
                 const usernameTk = inputTk.replace(/^@/, '').trim();
 
-                // Verifica se o perfil existe no RSSHub antes de registrar
                 await sock.sendMessage(jid, { text: `⏳ Verificando perfil @${usernameTk}...` }, { quoted: m });
                 try {
-                    const testRes = await axios.get(`https://rsshub.app/tiktok/user/@${usernameTk}`, {
-                        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AtrinoBot/1.0)' },
-                        timeout: 12000
-                    });
+                    const videoInicial = await buscarUltimoVideoTikTok(usernameTk);
 
-                    // Extrai o ID do vídeo mais recente para não alertar de cara
-                    let primeiroId = null;
-                    const guidMatch = testRes.data.match(/<guid[^>]*>(.*?)<\/guid>/);
-                    if (guidMatch) primeiroId = guidMatch[1].trim();
+                    // Salva o ID atual para não alertar de cara na ativação
+                    alertasTikTok[jid] = { username: usernameTk, ultimoVideoId: videoInicial.id };
 
-                    alertasTikTok[jid] = { username: usernameTk, ultimoVideoId: primeiroId };
                     await sock.sendMessage(jid, {
-                        text: `✅ *Alerta TikTok ativado!*\n\n👤 Perfil monitorado: @${usernameTk}\n⏱️ Verificação: a cada 5 minutos\n\nQuando sair um vídeo novo, o bot avisará aqui neste grupo.\n\nPara remover: *.remover_alert_tiktok*`
+                        text: `✅ *Alerta TikTok ativado!*\n\n👤 Perfil monitorado: @${usernameTk}\n📹 Último vídeo: ${videoInicial.titulo}\n⏱️ Verificação: a cada 5 minutos\n\nQuando sair um vídeo novo, o bot avisará aqui.\n\nPara remover: *.remover_alert_tiktok*`
                     }, { quoted: m });
                 } catch (tkErr) {
+                    console.error('[alert_tiktok]', tkErr.message);
                     await sock.sendMessage(jid, {
-                        text: `❌ Não foi possível acessar o perfil *@${usernameTk}*.\n\nVerifique se o @ está correto e tente novamente.`
+                        text: `❌ Não foi possível acessar o perfil *@${usernameTk}*.\n\nVerifique se o @ está correto, se o perfil é público e tente novamente.`
                     }, { quoted: m });
                 }
                 break;
