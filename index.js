@@ -499,6 +499,23 @@ async function startAtrinoBot() {
             await sock.sendMessage(jid, { text: `📢 *Chamada Geral!*`, mentions: meta.participants.map(p => p.id) });
         }
 
+        // --- CAPTURA ESCOLHA DE HORÁRIO (resposta numérica após .login_triagem) ---
+        if (adminsTriagem[sender]?._aguardandoEscolha && /^[1-6]$/.test(body.trim())) {
+            const dadosAdm = adminsTriagem[sender];
+            const idx = parseInt(body.trim()) - 1;
+            if (dadosAdm._slotsDisponiveis?.[idx]) {
+                dadosAdm.horarioMarcado = dadosAdm._slotsDisponiveis[idx];
+                dadosAdm._aguardandoEscolha = false;
+                delete dadosAdm._slotsDisponiveis;
+                sessaoTriagemResponsavel = sender;
+                await sock.sendMessage(jid, {
+                    text: `✅ *Plantão marcado!*\n\n👔 *${dadosAdm.apelido}* está de plantão agora\n🕐 Horário marcado: *${dadosAdm.horarioMarcado}*\n\nApenas você pode aprovar/reprovar as triagens desta sessão.`,
+                    mentions: [sender]
+                });
+            }
+            return;
+        }
+
         if (!body.startsWith('.')) return;
 
         const args    = body.slice(1).trim().split(/ +/);
@@ -1158,25 +1175,6 @@ async function startAtrinoBot() {
                     await sock.sendMessage(jid, { text: `💘 *ORÁCULO DO AMOR*\n\n@${t1.split('@')[0]} ${c} *${p}%* ${c} @${t2.split('@')[0]}\n\n${f}\n💰 Saldo: ${saldosUFSC[sender]}`, mentions: [t1, t2] }, { quoted: m });
                 } catch { await sock.sendMessage(jid, { text: '❌ Erro.' }); }
                 break;
-            }
-        }
-
-        // --------------------------------------------------------
-        // CAPTURA ESCOLHA DE HORÁRIO APÓS LOGIN
-        // (mensagem numérica de adm que está aguardando escolha)
-        // --------------------------------------------------------
-        if (adminsTriagem[sender]?._aguardandoEscolha && /^[1-6]$/.test(body.trim())) {
-            const dadosAdm = adminsTriagem[sender];
-            const idx = parseInt(body.trim()) - 1;
-            if (dadosAdm._slotsDisponiveis && dadosAdm._slotsDisponiveis[idx]) {
-                dadosAdm.horarioMarcado = dadosAdm._slotsDisponiveis[idx];
-                dadosAdm._aguardandoEscolha = false;
-                delete dadosAdm._slotsDisponiveis;
-                sessaoTriagemResponsavel = sender;
-                await sock.sendMessage(jid, {
-                    text: `✅ *Plantão marcado!*\n\n👔 *${dadosAdm.apelido}* está de plantão\n🕐 Horário: *${dadosAdm.horarioMarcado}*\n\nApenas você pode aprovar/reprovar as triagens desta sessão.`,
-                    mentions: [sender]
-                });
             }
         }
     });
