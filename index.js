@@ -677,166 +677,229 @@ async function startAtrinoBot() {
                 filaAtiva = false;
                 filaPendente.length = 0;
                 filaEmAnalise = null;
-                await sock.sendMessage(jid, { text: '🛑 Fila sequencial desativada.' }, { quoted: m });
+                await sock.sendMessage(jid, { text: '⏹️ *FILA SEQUENCIAL DESATIVADA!*' }, { quoted: m });
                 break;
 
-            case 'registrar_link':
+            case 'registrar_link': {
                 if (!isSenderAdmin) return;
-                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Informe o link do grupo. Ex: .registrar_link https://chat.whatsapp.com/...' }, { quoted: m });
-                linkGrupoTriagem = args[0];
-                await sock.sendMessage(jid, { text: `✅ Link registrado com sucesso!\n🔗 ${linkGrupoTriagem}` }, { quoted: m });
+                const link = args[0];
+                if (!link || !link.includes('chat.whatsapp.com')) return sock.sendMessage(jid, { text: '❌ Forneça um link válido do WhatsApp.' }, { quoted: m });
+                linkGrupoTriagem = link;
+                await sock.sendMessage(jid, { text: `✅ Link registrado:\n${linkGrupoTriagem}` }, { quoted: m });
                 break;
+            }
 
             case 'registrar_adm': {
                 if (!isSenderAdmin) return;
-                const alvoAdm = getMention();
-                if (!alvoAdm || args.length < 2) {
-                    return sock.sendMessage(jid, { text: '❌ Uso: *.registrar_adm @usuario Apelido Senha*' }, { quoted: m });
-                }
-                const apelido = args[0].startsWith('@') ? args[1] : args[0];
-                const senhaRaw = args[args.length - 1];
-                adminsTriagem[alvoAdm] = {
+                const alvo = getMention();
+                const apelido = args[1];
+                const senhaRaw = args[2];
+                if (!alvo || !apelido || !senhaRaw) return sock.sendMessage(jid, { text: '❌ Uso: *.registrar_adm @usuario apelido senha*' }, { quoted: m });
+
+                adminsTriagem[alvo] = {
                     apelido,
                     senhaHash: hashSenha(senhaRaw),
-                    triagensAprovadas: 0,
-                    horarioMarcado: null
+                    triagensRealizadas: 0,
+                    horarioMarcado: null,
+                    _aguardandoEscolha: false
                 };
-                await sock.sendMessage(jid, { text: `✅ Admin de triagem cadastrado!\n👤 @${alvoAdm.split('@')[0]}\n🏷️ Apelido: ${apelido}`, mentions: [alvoAdm] }, { quoted: m });
+
+                await sock.sendMessage(jid, { text: `✅ Adm de Triagem cadastrado!\n👤 @${alvo.split('@')[0]}\n🏷️ Apelido: *${apelido}*`, mentions: [alvo] }, { quoted: m });
                 break;
             }
 
             case 'login_triagem': {
-                if (!adminsTriagem[sender]) return sock.sendMessage(jid, { text: '❌ Você não está cadastrado como admin de triagem.' }, { quoted: m });
-                const senhaDig = args[0];
-                if (!senhaDig || hashSenha(senhaDig) !== adminsTriagem[sender].senhaHash) {
-                    return sock.sendMessage(jid, { text: '❌ Senha incorreta.' }, { quoted: m });
+                const senhaDigitada = args[0];
+                if (!senhaDigitada) return sock.sendMessage(jid, { text: '❌ Informe sua senha: *.login_triagem <sua_senha>*' }, { quoted: m });
+
+                const dadosAdm = adminsTriagem[sender];
+                if (!dadosAdm) return sock.sendMessage(jid, { text: '❌ Você não está cadastrado como Adm de Triagem.' }, { quoted: m });
+
+                if (hashSenha(senhaDigitada) !== dadosAdm.senhaHash) {
+                    return sock.sendMessage(jid, { text: '❌ Senha incorreta!' }, { quoted: m });
                 }
 
                 const slots = gerarHorariosDisponiveis();
-                adminsTriagem[sender]._slotsDisponiveis = slots;
-                adminsTriagem[sender]._aguardandoEscolha = true;
+                dadosAdm._slotsDisponiveis = slots;
+                dadosAdm._aguardandoEscolha = true;
 
-                let txtSlots = `✅ *Login efetuado, ${adminsTriagem[sender].apelido}!*\n\nEscolha o horário do seu plantão digitando apenas o número:\n\n`;
-                slots.forEach((s, i) => { txtSlots += `${i + 1}️⃣ ${s}\n`; });
+                let txt = `🔓 *LOGIN CONFIRMADO - ${dadosAdm.apelido}*\n\nSelecione seu horário de plantão respondendo com o número:\n\n`;
+                slots.forEach((s, idx) => { txt += `*${idx + 1}* - ${s}\n`; });
 
-                await sock.sendMessage(jid, { text: txtSlots }, { quoted: m });
+                await sock.sendMessage(jid, { text: txt }, { quoted: m });
                 break;
             }
 
             case 'aprovar': {
                 if (!isSenderAdmin) return;
-                if (sessaoTriagemResponsavel && sender !== sessaoTriagemResponsavel && sender !== DONO_SUPREMO) {
-                    return sock.sendMessage(jid, { text: `⚠️ Apenas o responsável do plantão (@${sessaoTriagemResponsavel.split('@')[0]}) pode aprovar!`, mentions: [sessaoTriagemResponsavel] }, { quoted: m });
+                const ticketNum = parseInt(args[0]);
+
+                if (filaAtiva && filaEmAnalise) {
+                    if (ticketNum && filaEmAnalise.ticket !== ticketNum) {
+                        return sock.sendMessage(jid, { text: `⚠️ O ticket em análise no momento é o *#${filaEmAnalise.ticket}*.` }, { quoted: m });
+                    }
+
+                    if (sessaoTriagemResponsavel && sender !== sessaoTriagemResponsavel && sender !== DONO_SUPREMO) {
+                        const respApelido = adminsTriagem[sessaoTriagemResponsavel]?.apelido || 'outro adm';
+                        return sock.sendMessage(jid, { text: `⛔ Apenas *${respApelido}* (responsável pelo plantão) pode aprovar/reprovar agora.` }, { quoted: m });
+                    }
+
+                    const alvoJid = filaEmAnalise.senderJid;
+                    if (adminsTriagem[sender]) adminsTriagem[sender].triagensRealizadas++;
+
+                    const msgAprovado = linkGrupoTriagem
+                        ? `🎉 *PARABÉNS! SUAS FOTOS / AUDIOS FORAM APROVADOS!*\n\nEntre no grupo através do link abaixo:\n${linkGrupoTriagem}`
+                        : `🎉 *PARABÉNS! SUAS FOTOS / AUDIOS FORAM APROVADOS!*`;
+
+                    try { await sock.sendMessage(alvoJid, { text: msgAprovado }); } catch {}
+
+                    await sock.sendMessage(jid, { text: `✅ Ticket *#${filaEmAnalise.ticket}* (${filaEmAnalise.numeroExibir}) APROVADO com sucesso!` });
+
+                    filaEmAnalise = null;
+                    await enviarProximaTriagemAoGrupo(sock);
+                    return;
                 }
-                const ticketAprov = parseInt(args[0]);
-                if (!ticketAprov || !filaEmAnalise || filaEmAnalise.ticket !== ticketAprov) {
-                    return sock.sendMessage(jid, { text: '❌ Ticket inválido ou não é o ticket atual da fila.' }, { quoted: m });
-                }
 
-                const candJid = filaEmAnalise.senderJid;
-                if (adminsTriagem[sender]) adminsTriagem[sender].triagensAprovadas++;
+                const alvo = getMention();
+                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque o usuário ou use com o número do ticket da fila.' }, { quoted: m });
 
-                const msgAprov = linkGrupoTriagem 
-                    ? `🎉 *PARABÉNS! Sua triagem foi APROVADA!*\n\nEntre no grupo pelo link abaixo:\n🔗 ${linkGrupoTriagem}`
-                    : `🎉 *PARABÉNS! Sua triagem foi APROVADA!*`;
+                if (adminsTriagem[sender]) adminsTriagem[sender].triagensRealizadas++;
+                const msgAprovadoDirect = linkGrupoTriagem
+                    ? `🎉 *PARABÉNS! SUAS FOTOS / AUDIOS FORAM APROVADOS!*\n\nEntre no grupo através do link abaixo:\n${linkGrupoTriagem}`
+                    : `🎉 *PARABÉNS! SUAS FOTOS / AUDIOS FORAM APROVADOS!*`;
 
-                try { await sock.sendMessage(candJid, { text: msgAprov }); } catch {}
-
-                await sock.sendMessage(jid, { text: `✅ *Triagem #${ticketAprov} APROVADA!* Notificação enviada ao candidato.` }, { quoted: m });
-
-                filaEmAnalise = null;
-                await enviarProximaTriagemAoGrupo(sock);
+                try { await sock.sendMessage(alvo, { text: msgAprovadoDirect }); } catch {}
+                await sock.sendMessage(jid, { text: `✅ @${alvo.split('@')[0]} APROVADO(A)!`, mentions: [alvo] }, { quoted: m });
                 break;
             }
 
             case 'reprovar': {
                 if (!isSenderAdmin) return;
-                if (sessaoTriagemResponsavel && sender !== sessaoTriagemResponsavel && sender !== DONO_SUPREMO) {
-                    return sock.sendMessage(jid, { text: `⚠️ Apenas o responsável do plantão (@${sessaoTriagemResponsavel.split('@')[0]}) pode reprovar!`, mentions: [sessaoTriagemResponsavel] }, { quoted: m });
+                const ticketNumRep = parseInt(args[0]);
+
+                if (filaAtiva && filaEmAnalise) {
+                    if (ticketNumRep && filaEmAnalise.ticket !== ticketNumRep) {
+                        return sock.sendMessage(jid, { text: `⚠️ O ticket em análise no momento é o *#${filaEmAnalise.ticket}*.` }, { quoted: m });
+                    }
+
+                    if (sessaoTriagemResponsavel && sender !== sessaoTriagemResponsavel && sender !== DONO_SUPREMO) {
+                        const respApelido = adminsTriagem[sessaoTriagemResponsavel]?.apelido || 'outro adm';
+                        return sock.sendMessage(jid, { text: `⛔ Apenas *${respApelido}* (responsável pelo plantão) pode aprovar/reprovar agora.` }, { quoted: m });
+                    }
+
+                    const alvoJid = filaEmAnalise.senderJid;
+                    if (adminsTriagem[sender]) adminsTriagem[sender].triagensRealizadas++;
+
+                    try {
+                        await sock.sendMessage(alvoJid, {
+                            text: `❌ *SUA TRIAGEM FOI REPROVADA.*\n\nSeus prints ou áudios não atingiram os requisitos necessários.`
+                        });
+                    } catch {}
+
+                    await sock.sendMessage(jid, { text: `❌ Ticket *#${filaEmAnalise.ticket}* (${filaEmAnalise.numeroExibir}) REPROVADO.` });
+
+                    filaEmAnalise = null;
+                    await enviarProximaTriagemAoGrupo(sock);
+                    return;
                 }
-                const ticketReprov = parseInt(args[0]);
-                if (!ticketReprov || !filaEmAnalise || filaEmAnalise.ticket !== ticketReprov) {
-                    return sock.sendMessage(jid, { text: '❌ Ticket inválido ou não é o ticket atual da fila.' }, { quoted: m });
-                }
 
-                const candJidRep = filaEmAnalise.senderJid;
-                try { await sock.sendMessage(candJidRep, { text: `❌ *Sua triagem foi REPROVADA.*` }); } catch {}
+                const alvoRep = getMention();
+                if (!alvoRep) return sock.sendMessage(jid, { text: '❌ Marque o usuário ou use com o número do ticket da fila.' }, { quoted: m });
 
-                await sock.sendMessage(jid, { text: `❌ *Triagem #${ticketReprov} REPROVADA!* Candidate notificado.` }, { quoted: m });
-
-                filaEmAnalise = null;
-                await enviarProximaTriagemAoGrupo(sock);
+                if (adminsTriagem[sender]) adminsTriagem[sender].triagensRealizadas++;
+                try {
+                    await sock.sendMessage(alvoRep, {
+                        text: `❌ *SUA TRIAGEM FOI REPROVADA.*\n\nSeus prints ou áudios não atingiram os requisitos necessários.`
+                    });
+                } catch {}
+                await sock.sendMessage(jid, { text: `❌ @${alvoRep.split('@')[0]} REPROVADO(A).`, mentions: [alvoRep] }, { quoted: m });
                 break;
             }
 
             case 'metas': {
                 if (!isSenderAdmin) return;
-                let painel = `📊 *PAINEL DE METAS DE TRIAGEM*\n🎯 Meta individual: *${metaTriagens}*\n\n`;
-                for (const [id, adm] of Object.entries(adminsTriagem)) {
-                    const prog = adm.triagensAprovadas;
-                    const pct = Math.min(100, Math.round((prog / metaTriagens) * 100));
-                    painel += `👤 *${adm.apelido}* (@${id.split('@')[0]})\n└ Realizadas: ${prog}/${metaTriagens} [${pct}%]\n\n`;
+                let txt = `📊 *PAINEL DE METAS DE TRIAGEM*\n🎯 Meta atual: *${metaTriagens} triagens*\n\n`;
+                const admsList = Object.entries(adminsTriagem);
+
+                if (!admsList.length) {
+                    txt += `_Nenhum adm cadastrado ainda. Use .registrar_adm_`;
+                } else {
+                    admsList.forEach(([jidAdm, dados]) => {
+                        const pct = Math.min(100, Math.round((dados.triagensRealizadas / metaTriagens) * 100));
+                        const barra = '█'.repeat(Math.floor(pct / 10)) + '░'.repeat(10 - Math.floor(pct / 10));
+                        const statusPlantao = sessaoTriagemResponsavel === jidAdm ? '🟢 [EM PLANTÃO]' : '';
+                        txt += `👔 *${dados.apelido}* ${statusPlantao}\n`;
+                        txt += `   └ Realizadas: *${dados.triagensRealizadas}/${metaTriagens}* [${barra}] ${pct}%\n`;
+                        if (dados.horarioMarcado) txt += `   └ Horário: ${dados.horarioMarcado}\n`;
+                    });
                 }
-                await sock.sendMessage(jid, { text: painel, mentions: Object.keys(adminsTriagem) }, { quoted: m });
+                await sock.sendMessage(jid, { text: txt }, { quoted: m });
                 break;
             }
 
             case 'alterar_meta': {
                 if (!isSenderAdmin) return;
                 const novaMeta = parseInt(args[0]);
-                if (isNaN(novaMeta) || novaMeta <= 0) return sock.sendMessage(jid, { text: '❌ Valor inválido.' }, { quoted: m });
+                if (isNaN(novaMeta) || novaMeta <= 0) return sock.sendMessage(jid, { text: '❌ Forneça um número válido maior que 0.' }, { quoted: m });
                 metaTriagens = novaMeta;
-                await sock.sendMessage(jid, { text: `🎯 Nova meta configurada: *${metaTriagens} triagens*` }, { quoted: m });
+                await sock.sendMessage(jid, { text: `✅ Meta atualizada para *${metaTriagens}* triagens por adm.` }, { quoted: m });
                 break;
             }
 
             case 's':
             case 'figurinha':
             case 'a': {
-                const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                const msgMidia = quoted || m.message;
-                const mediaInfo = await baixarMidiaDoMensagem(sock, msgMidia);
-                
-                if (!mediaInfo || mediaInfo.tipo !== 'image') {
-                    return sock.sendMessage(jid, { text: '❌ Marque uma imagem ou envie uma foto com o comando .' + command }, { quoted: m });
+                const isAnim = command === 'a';
+                const cost   = isAnim ? precoFigurinha * 2 : precoFigurinha;
+                const saldo  = saldosUFSC[sender] || 0;
+
+                if (saldo < cost && sender !== DONO_SUPREMO) {
+                    return sock.sendMessage(jid, { text: `❌ Saldo insuficiente. Custa ${cost} UFSC. Seu saldo: ${saldo}` }, { quoted: m });
                 }
 
-                if ((saldosUFSC[sender] || 0) < precoFigurinha && sender !== DONO_SUPREMO) {
-                    return sock.sendMessage(jid, { text: `❌ Saldo insuficiente! Preço: ${precoFigurinha} UFSC. Seu saldo: ${saldosUFSC[sender] || 0}` }, { quoted: m });
+                const msgComMidia = m.message.extendedTextMessage?.contextInfo?.quotedMessage || m.message;
+                const media = await baixarMidiaDoMensagem(sock, msgComMidia);
+
+                if (!media || (media.tipo !== 'image' && media.tipo !== 'video')) {
+                    return sock.sendMessage(jid, { text: '❌ Marque ou envie uma imagem/vídeo curto.' }, { quoted: m });
                 }
 
-                if (sender !== DONO_SUPREMO) saldosUFSC[sender] -= precoFigurinha;
-
-                const sticker = new Sticker(mediaInfo.buffer, {
-                    pack: 'Atrino Bot', author: 'Atrino',
-                    type: StickerTypes.FULL, quality: 70
-                });
-                const stkerBuffer = await sticker.toBuffer();
-                await sock.sendMessage(jid, { sticker: stkerBuffer }, { quoted: m });
+                try {
+                    const sticker = new Sticker(media.buffer, {
+                        pack: 'Atrino Bot', author: 'Atrino',
+                        type: StickerTypes.FULL, quality: 70
+                    });
+                    const buf = await sticker.toBuffer();
+                    if (sender !== DONO_SUPREMO) saldosUFSC[sender] -= cost;
+                    await sock.sendMessage(jid, { sticker: buf }, { quoted: m });
+                } catch (err) {
+                    await sock.sendMessage(jid, { text: '❌ Erro ao criar figurinha.' }, { quoted: m });
+                }
                 break;
             }
 
             case 'mat':
             case 'match': {
-                const target = getMention();
-                if (!target) return sock.sendMessage(jid, { text: '❌ Marque alguém para ver o match!' }, { quoted: m });
-                const porcentagem = Math.floor(Math.random() * 101);
+                const alvo = getMention();
+                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
+                const pct = Math.floor(Math.random() * 101);
                 await sock.sendMessage(jid, {
-                    text: `❤️ *MATCH ANALYSER*\n\n👤 @${sender.split('@')[0]}\n💖 @${target.split('@')[0]}\n\n🔥 Compatibilidade: *${porcentagem}%*`,
-                    mentions: [sender, target]
+                    text: `💘 *MATCH DETECTOR*\n\n@${sender.split('@')[0]} + @${alvo.split('@')[0]}\n\nCompatibilidade: *${pct}%*`,
+                    mentions: [sender, alvo]
                 }, { quoted: m });
                 break;
             }
 
             case 'cep': {
-                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Digite o CEP. Ex: .cep 01001000' }, { quoted: m });
+                const cepInput = args[0]?.replace(/\D/g, '');
+                if (!cepInput || cepInput.length !== 8) return sock.sendMessage(jid, { text: '❌ CEP inválido. Use 8 dígitos.' }, { quoted: m });
                 try {
-                    const res = await axios.get(`https://viacep.com.br/ws/${args[0].replace(/\D/g, '')}/json/`);
+                    const res = await axios.get(`https://viacep.com.br/ws/${cepInput}/json/`);
                     if (res.data.erro) return sock.sendMessage(jid, { text: '❌ CEP não encontrado.' }, { quoted: m });
                     const d = res.data;
-                    await sock.sendMessage(jid, { text: `📍 *CEP:* ${d.cep}\n🏙️ *Logradouro:* ${d.logradouro}\n🏡 *Bairro:* ${d.bairro}\n🌆 *Cidade:* ${d.localidade}-${d.uf}` }, { quoted: m });
+                    await sock.sendMessage(jid, { text: `📍 *CONSULTA CEP*\n\n🏠 Logradouro: ${d.logradouro}\n🏡 Bairro: ${d.bairro}\n🏙️ Cidade: ${d.localidade} - ${d.uf}\n📮 CEP: ${d.cep}` }, { quoted: m });
                 } catch {
-                    await sock.sendMessage(jid, { text: `❌ Erro ao consultar CEP.` }, { quoted: m });
+                    await sock.sendMessage(jid, { text: '❌ Erro na consulta.' }, { quoted: m });
                 }
                 break;
             }
@@ -844,187 +907,198 @@ async function startAtrinoBot() {
             case 'contador':
                 if (!isSenderAdmin) return;
                 contagemAtiva[jid] = !contagemAtiva[jid];
-                await sock.sendMessage(jid, { text: contagemAtiva[jid] ? '📊 Contagem de mensagens ativada!' : '🛑 Contagem desativada.' }, { quoted: m });
+                await sock.sendMessage(jid, { text: contagemAtiva[jid] ? '📊 Contagem de mensagens ATIVADA.' : '📊 Contagem DESATIVADA.' }, { quoted: m });
                 break;
 
             case 'doar': {
                 if (!isSenderAdmin) return;
-                const rec = getMention();
-                const val = parseInt(args.find(a => !a.startsWith('@')));
-                if (!rec || isNaN(val)) return sock.sendMessage(jid, { text: '❌ Uso: .doar @usuario 10' }, { quoted: m });
-                saldosUFSC[rec] = (saldosUFSC[rec] || 0) + val;
-                await sock.sendMessage(jid, { text: `💰 Doado ${val} UFSC para @${rec.split('@')[0]}!`, mentions: [rec] }, { quoted: m });
+                const alvo = getMention();
+                const valor = parseInt(args[1] || args[0]);
+                if (!alvo || isNaN(valor)) return sock.sendMessage(jid, { text: '❌ Uso: *.doar @user 10*' }, { quoted: m });
+                saldosUFSC[alvo] = (saldosUFSC[alvo] || 0) + valor;
+                await sock.sendMessage(jid, { text: `💰 Doado ${valor} UFSC para @${alvo.split('@')[0]}. Novo saldo: ${saldosUFSC[alvo]}`, mentions: [alvo] }, { quoted: m });
                 break;
             }
 
             case 'id':
-                await sock.sendMessage(jid, { text: `🆔 ID do Chat: *${jid}*` }, { quoted: m });
+                await sock.sendMessage(jid, { text: `🆔 ID do Grupo:\n\`${jid}\`` }, { quoted: m });
                 break;
 
             case 'ranking': {
-                if (!estatisticas[jid]) return sock.sendMessage(jid, { text: '📊 Nenhuma estatística registrada ainda.' }, { quoted: m });
-                const ordenados = Object.entries(estatisticas[jid]).sort((a, b) => b[1].total - a[1].total).slice(0, 10);
-                let txtRank = `🏆 *TOP 10 MAIS ATIVOS*\n\n`;
-                ordenados.forEach(([id, st], i) => {
-                    txtRank += `${i + 1}. @${id.split('@')[0]} — *${st.total}* msgs\n`;
+                if (!estatisticas[jid]) return sock.sendMessage(jid, { text: '📊 Nenhuma estatística registrada.' }, { quoted: m });
+                const ordenado = Object.entries(estatisticas[jid]).sort((a, b) => b[1].total - a[1].total).slice(0, 10);
+                let txt = '🏆 *TOP 10 MAIS ATIVOS*\n\n';
+                const ment = [];
+                ordenado.forEach(([uid, st], idx) => {
+                    txt += `${idx + 1}. @${uid.split('@')[0]} — *${st.total}* msgs\n`;
+                    ment.push(uid);
                 });
-                await sock.sendMessage(jid, { text: txtRank, mentions: ordenados.map(x => x[0]) }, { quoted: m });
+                await sock.sendMessage(jid, { text: txt, mentions: ment }, { quoted: m });
                 break;
             }
 
             case 'ativar_anagrama':
                 if (!isSenderAdmin) return;
-                anagramaGame.ativo = true;
-                anagramaGame.jid = jid;
+                if (anagramaGame.ativo) return sock.sendMessage(jid, { text: '⚠️ Já existe um jogo em andamento.' }, { quoted: m });
                 const novo = gerarAnagrama();
-                anagramaGame.palavra = novo.original;
-                anagramaGame.embaralhada = novo.embaralhada;
-                await sock.sendMessage(jid, { text: `🎮 *JOGO DO ANAGRAMA INICIADO!*\n\nDescubra a palavra:\n🧩 *${anagramaGame.embaralhada}*` });
+                anagramaGame = { ativo: true, palavra: novo.original, embaralhada: novo.embaralhada, jid };
+                await sock.sendMessage(jid, { text: `🎮 *JOGO DO ANAGRAMA INICIADO!*\n\nDescubra a palavra:\n🧩 *${anagramaGame.embaralhada}*\n\nQuem acertar primeiro ganha 1 UFSC!` });
                 break;
 
             case 'desativa_anagrama':
                 if (!isSenderAdmin) return;
-                anagramaGame.ativo = false;
-                await sock.sendMessage(jid, { text: '🛑 Jogo do Anagrama encerrado.' }, { quoted: m });
+                anagramaGame = { ativo: false, palavra: '', embaralhada: '', jid: '' };
+                await sock.sendMessage(jid, { text: '🛑 Anagrama desativado.' }, { quoted: m });
                 break;
 
             case 'notificar':
                 if (!isSenderAdmin) return;
                 notificacoesAtivas[jid] = true;
-                await sock.sendMessage(jid, { text: '🔔 Notificações de novos membros ativadas!' }, { quoted: m });
+                await sock.sendMessage(jid, { text: '🔔 Boas-vindas ativadas.' }, { quoted: m });
                 break;
 
             case 'naonotificar':
                 if (!isSenderAdmin) return;
                 notificacoesAtivas[jid] = false;
-                await sock.sendMessage(jid, { text: '🔕 Notificações de novos membros desativadas.' }, { quoted: m });
+                await sock.sendMessage(jid, { text: '🔕 Boas-vindas desativadas.' }, { quoted: m });
                 break;
 
-            case 'alert_tiktok':
+            case 'alert_tiktok': {
                 if (!isSenderAdmin) return;
-                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Digite o usuário do TikTok.' }, { quoted: m });
-                alertasTikTok[jid] = { username: args[0].replace('@', ''), ultimoVideoId: null };
-                await sock.sendMessage(jid, { text: `🎵 Alerta ativado para @${alertasTikTok[jid].username}` }, { quoted: m });
+                const userTk = args[0]?.replace('@', '');
+                if (!userTk) return sock.sendMessage(jid, { text: '❌ Informe o username do TikTok.' }, { quoted: m });
+                alertasTikTok[jid] = { username: userTk, ultimoVideoId: null };
+                await sock.sendMessage(jid, { text: `🎵 Alerta ativado para *@${userTk}* neste grupo!` }, { quoted: m });
                 break;
+            }
 
             case 'remover_alert_tiktok':
                 if (!isSenderAdmin) return;
                 delete alertasTikTok[jid];
-                await sock.sendMessage(jid, { text: '🛑 Alerta do TikTok removido.' }, { quoted: m });
+                await sock.sendMessage(jid, { text: '🛑 Alertas do TikTok removidos.' }, { quoted: m });
                 break;
 
             case 'tornaadm': {
                 if (!isSenderAdmin) return;
-                const target = getMention();
-                if (!target) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
-                await sock.groupParticipantsUpdate(jid, [target], 'promote');
-                await sock.sendMessage(jid, { text: `👑 @${target.split('@')[0]} promovido a Admin!`, mentions: [target] }, { quoted: m });
+                const alvo = getMention();
+                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
+                await sock.groupParticipantsUpdate(jid, [alvo], 'promote');
+                await sock.sendMessage(jid, { text: `👑 @${alvo.split('@')[0]} promovido a admin!`, mentions: [alvo] }, { quoted: m });
                 break;
             }
 
             case 'rebaixar': {
                 if (!isSenderAdmin) return;
-                const target = getMention();
-                if (!target) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
-                await sock.groupParticipantsUpdate(jid, [target], 'demote');
-                await sock.sendMessage(jid, { text: `📉 @${target.split('@')[0]} rebaixado.`, mentions: [target] }, { quoted: m });
+                const alvo = getMention();
+                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
+                await sock.groupParticipantsUpdate(jid, [alvo], 'demote');
+                await sock.sendMessage(jid, { text: `📉 @${alvo.split('@')[0]} rebaixado.`, mentions: [alvo] }, { quoted: m });
                 break;
             }
 
             case 'totag': {
                 if (!isSenderAdmin) return;
                 const meta = await sock.groupMetadata(jid);
-                const txt = args.join(' ') || '📢 Chamada geral!';
+                const txt = args.join(' ') || '📢 *Atenção todos!*';
                 await sock.sendMessage(jid, { text: txt, mentions: meta.participants.map(p => p.id) });
                 break;
             }
 
             case 'adv': {
                 if (!isSenderAdmin) return;
-                const target = getMention();
-                if (!target) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
-                advertencias[target] = (advertencias[target] || 0) + 1;
-                await sock.sendMessage(jid, { text: `⚠️ @${target.split('@')[0]} recebeu advertência! Total: ${advertencias[target]}/3`, mentions: [target] }, { quoted: m });
-                if (advertencias[target] >= 3) {
-                    await sock.groupParticipantsUpdate(jid, [target], 'remove');
-                    delete advertencias[target];
+                const alvo = getMention();
+                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
+                advertencias[alvo] = (advertencias[alvo] || 0) + 1;
+                if (advertencias[alvo] >= 3) {
+                    await sock.sendMessage(jid, { text: `🚫 @${alvo.split('@')[0]} atingiu 3/3 advs. Removido.`, mentions: [alvo] });
+                    await sock.groupParticipantsUpdate(jid, [alvo], 'remove');
+                    delete advertencias[alvo];
+                } else {
+                    await sock.sendMessage(jid, { text: `⚠️ @${alvo.split('@')[0]} recebeu advertência! Total: ${advertencias[alvo]}/3`, mentions: [alvo] });
                 }
                 break;
             }
 
             case 'unadv': {
                 if (!isSenderAdmin) return;
-                const target = getMention();
-                if (!target) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
-                if (advertencias[target]) advertencias[target]--;
-                await sock.sendMessage(jid, { text: `✅ Advertência removida de @${target.split('@')[0]}. Total: ${advertencias[target] || 0}/3`, mentions: [target] }, { quoted: m });
+                const alvo = getMention();
+                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
+                if (advertencias[alvo]) {
+                    advertencias[alvo]--;
+                    await sock.sendMessage(jid, { text: `✅ Adv removida de @${alvo.split('@')[0]}. Restantes: ${advertencias[alvo]}/3`, mentions: [alvo] });
+                } else {
+                    await sock.sendMessage(jid, { text: '⚠️ Usuário não tem advertências.' }, { quoted: m });
+                }
                 break;
             }
 
             case 'mute': {
                 if (!isSenderAdmin) return;
-                const target = getMention();
-                if (!target) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
-                if (!mutados.includes(target)) mutados.push(target);
-                await sock.sendMessage(jid, { text: `🔇 @${target.split('@')[0]} mutado!`, mentions: [target] }, { quoted: m });
+                const alvo = getMention();
+                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
+                if (!mutados.includes(alvo)) mutados.push(alvo);
+                await sock.sendMessage(jid, { text: `🔇 @${alvo.split('@')[0]} mutado.`, mentions: [alvo] }, { quoted: m });
                 break;
             }
 
             case 'desmute': {
                 if (!isSenderAdmin) return;
-                const target = getMention();
-                if (!target) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
-                mutados = mutados.filter(x => x !== target);
-                await sock.sendMessage(jid, { text: `🔊 @${target.split('@')[0]} desmutado!`, mentions: [target] }, { quoted: m });
-                break;
-            }
-
-            case 'ban': {
-                if (!isSenderAdmin) return;
-                const target = getMention();
-                if (!target) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
-                await sock.groupParticipantsUpdate(jid, [target], 'remove');
-                await sock.sendMessage(jid, { text: `🚫 @${target.split('@')[0]} banido!`, mentions: [target] }, { quoted: m });
+                const alvo = getMention();
+                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
+                mutados = mutados.filter(x => x !== alvo);
+                await sock.sendMessage(jid, { text: `🔊 @${alvo.split('@')[0]} desmutado.`, mentions: [alvo] }, { quoted: m });
                 break;
             }
 
             case 'abrir':
                 if (!isSenderAdmin) return;
                 await sock.groupSettingUpdate(jid, 'not_announcement');
-                await sock.sendMessage(jid, { text: '🔓 Grupo aberto para todos!' }, { quoted: m });
+                await sock.sendMessage(jid, { text: '🔓 Grupo aberto para todos os membros.' }, { quoted: m });
                 break;
 
             case 'fechar':
                 if (!isSenderAdmin) return;
                 await sock.groupSettingUpdate(jid, 'announcement');
-                await sock.sendMessage(jid, { text: '🔒 Grupo fechado apenas para administradores!' }, { quoted: m });
+                await sock.sendMessage(jid, { text: '🔒 Grupo fechado (apenas admins falam).' }, { quoted: m });
                 break;
+
+            case 'ban': {
+                if (!isSenderAdmin) return;
+                const alvo = getMention();
+                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
+                await sock.groupParticipantsUpdate(jid, [alvo], 'remove');
+                await sock.sendMessage(jid, { text: `🚫 @${alvo.split('@')[0]} removido do grupo.`, mentions: [alvo] }, { quoted: m });
+                break;
+            }
 
             case 'aceitar': {
                 if (!isSenderAdmin) return;
-                const solicitante = solicitacoesPendentes[jid];
-                if (!solicitante) return sock.sendMessage(jid, { text: '❌ Nenhuma solicitação pendente.' }, { quoted: m });
-                try {
-                    await sock.groupRequestParticipantsUpdate(jid, [solicitante], 'approve');
-                    await sock.sendMessage(jid, { text: `✅ Solicitação de @${solicitante.split('@')[0]} aprovada!`, mentions: [solicitante] }, { quoted: m });
-                    delete solicitacoesPendentes[jid];
-                } catch {
-                    await sock.sendMessage(jid, { text: '❌ Falha ao aprovar entrada.' }, { quoted: m });
-                }
+                const sol = solicitacoesPendentes[jid];
+                if (!sol) return sock.sendMessage(jid, { text: '⚠️ Nenhuma solicitação pendente.' }, { quoted: m });
+                await sock.groupRequestParticipantsUpdate(jid, [sol], 'approve');
+                delete solicitacoesPendentes[jid];
+                await sock.sendMessage(jid, { text: '✅ Entrada aprovada!' }, { quoted: m });
                 break;
             }
 
             case 'recusar': {
                 if (!isSenderAdmin) return;
-                const solicitante = solicitacoesPendentes[jid];
-                if (!solicitante) return sock.sendMessage(jid, { text: '❌ Nenhuma solicitação pendente.' }, { quoted: m });
-                try {
-                    await sock.groupRequestParticipantsUpdate(jid, [solicitante], 'reject');
-                    await sock.sendMessage(jid, { text: `🚫 Solicitação de @${solicitante.split('@')[0]} recusada!`, mentions: [solicitante] }, { quoted: m });
-                    delete solicitacoesPendentes[jid];
-                } catch {
-                    await sock.sendMessage(jid, { text: '❌ Falha ao recusar entrada.' }, { quoted: m });
-                }
+                const sol = solicitacoesPendentes[jid];
+                if (!sol) return sock.sendMessage(jid, { text: '⚠️ Nenhuma solicitação pendente.' }, { quoted: m });
+                await sock.groupRequestParticipantsUpdate(jid, [sol], 'reject');
+                delete solicitacoesPendentes[jid];
+                await sock.sendMessage(jid, { text: '❌ Entrada recusada.' }, { quoted: m });
+                break;
+            }
+
+            case 'relatorio': {
+                if (!isSenderAdmin) return;
+                let txt = '📜 *HISTÓRICO DE ÚLTIMOS COMANDOS*\n\n';
+                historicoComandos.slice(-15).forEach(h => {
+                    txt += `🔹 .${h.comando} por @${h.usuario.split('@')[0]} [${h.horario}]\n`;
+                });
+                const ment = historicoComandos.slice(-15).map(h => h.usuario);
+                await sock.sendMessage(jid, { text: txt, mentions: ment }, { quoted: m });
                 break;
             }
 
@@ -1034,4 +1108,5 @@ async function startAtrinoBot() {
     });
 }
 
+// Inicia a execução do bot
 startAtrinoBot();
