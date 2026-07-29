@@ -43,40 +43,33 @@ const triagensFinalizadas = new Set();
 
 // ============================================================
 // SISTEMA DE FILA SEQUENCIAL
-// filaPendente  : triagens finalizadas aguardando envio ao grupo
-// filaEmAnalise : triagem atualmente visível no grupo (max 1)
 // ============================================================
 let filaAtiva         = false;
 let linkGrupoTriagem  = null;
 let contadorTicket    = 0;
-const filaPendente    = [];   // { ticket, senderJid, numeroExibir, sessao }
-let   filaEmAnalise   = null; // { ticket, senderJid, numeroExibir, status }
+const filaPendente    = [];   
+let   filaEmAnalise   = null; 
 
 // ============================================================
 // SISTEMA DE ADMINS DE TRIAGEM
-// adminsTriagem: { [jidAdm]: { apelido, senhaHash, loginAtivo,
-//                              horarioMarcado, triagemFeitas,
-//                              aprovacoes, reprovacoes } }
-// sessaoTriagemResponsavel: adm JID que está de plantão agora
-// metaTriagens: quantidade alvo de triagens por sessão
 // ============================================================
 const adminsTriagem          = {};
-let   sessaoTriagemResponsavel = null; // jid do adm de plantão
-let   metaTriagens           = 10;    // padrão 10, alterável
+let   sessaoTriagemResponsavel = null; 
+let   metaTriagens           = 10;    
 
 // ============================================================
 // SISTEMA DE ALERTA TIKTOK
 // ============================================================
 const alertasTikTok = {};
 
-// --- hash simples para senha (sem dependência extra) ---
+// --- Hash para senha ---
 function hashSenha(s) {
     let h = 0;
     for (let i = 0; i < s.length; i++) { h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; }
     return h.toString(16);
 }
 
-// --- busca último vídeo TikTok ---
+// --- Busca último vídeo TikTok ---
 async function buscarUltimoVideoTikTok(username) {
     const url = `https://www.tiktok.com/@${username}`;
     const headers = {
@@ -157,11 +150,11 @@ function gerarAnagrama() {
 }
 
 // ============================================================
-// FILA SEQUENCIAL — envia próxima triagem ao grupo
+// FILA SEQUENCIAL
 // ============================================================
 async function enviarProximaTriagemAoGrupo(sockInstance) {
-    if (filaEmAnalise) return; // já tem uma em análise, aguarda
-    if (!filaPendente.length) return; // fila vazia
+    if (filaEmAnalise) return;
+    if (!filaPendente.length) return;
 
     const proxima = filaPendente.shift();
     const responsavelApelido = sessaoTriagemResponsavel && adminsTriagem[sessaoTriagemResponsavel]
@@ -256,13 +249,9 @@ async function baixarMidiaDoMensagem(sock, message) {
     return null;
 }
 
-// ============================================================
-// HORÁRIOS DISPONÍVEIS PARA LOGIN DE TRIAGEM
-// ============================================================
 function gerarHorariosDisponiveis() {
     const agora = new Date();
     const slots = [];
-    // gera 6 slots de 30 em 30 min a partir da hora atual
     for (let i = 0; i < 6; i++) {
         const d = new Date(agora.getTime() + i * 30 * 60 * 1000);
         const h = d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
@@ -271,13 +260,16 @@ function gerarHorariosDisponiveis() {
     return slots;
 }
 
+// ============================================================
+// BOT PRINCIPAL
+// ============================================================
 async function startAtrinoBot() {
     await loadEstadoBotFromGithub();
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
     const sock = makeWASocket({
-        logger, auth: state, printQRInTerminal: false,
-        browser: ['Mac OS', 'Chrome', '121.0.0.0'],
+        logger, auth: state, printQRInTerminal: true,
+        browser: ['Bot WhatsApp', 'Chrome', '1.0.0'],
         connectTimeoutMs: 120000, keepAliveIntervalMs: 30000,
         markOnline: true, shouldSyncHistoryMessage: () => false,
         receivedPendingNotifications: false,
@@ -323,19 +315,35 @@ async function startAtrinoBot() {
         if (Object.keys(alertasTikTok).length > 0) await checarNovosTikToks(sock);
     });
 
+    // --- CORREÇÃO DO LOOP DE RECONEXÃO AQUI ---
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
             qrAtual = qr;
             console.log('\n🔗 QR: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(qr));
-            qrcode.generate(qr, { small: false });
+            qrcode.generate(qr, { small: true });
         }
-        if (connection === 'open') { qrAtual = null; console.log('\n✅ ATRINO BOT ONLINE!\n'); }
+        if (connection === 'open') { 
+            qrAtual = null; 
+            console.log('\n✅ ATRINO BOT ONLINE!\n'); 
+        }
         if (connection === 'close') {
             qrAtual = null;
-            const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-            if (reason !== DisconnectReason.loggedOut) { console.log('🔄 Reconectando...'); startAtrinoBot(); }
-            else console.log('❌ Sessão encerrada permanentemente.');
+            const statusCode = (lastDisconnect?.error instanceof Boom) 
+                ? lastDisconnect.error.output.statusCode 
+                : lastDisconnect?.error?.code;
+
+            console.log(`⚠️ Conexão fechada. Motivo: ${statusCode}`);
+
+            // Se for 401 ou deslogado intencionalmente, NÃO entra em loop
+            const deveReconectar = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
+
+            if (deveReconectar) { 
+                console.log('🔄 Reconectando...'); 
+                startAtrinoBot(); 
+            } else {
+                console.log('❌ Sessão encerrada/expirada. É necessário escanear um novo QR Code.');
+            }
         }
     });
 
@@ -351,7 +359,6 @@ async function startAtrinoBot() {
         const sender  = m.key.participant || m.key.remoteJid;
         const body    = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || '');
 
-        // --- recebe mídia no PV durante triagem ---
         if (!isGroup && !m.message.conversation && !m.message.extendedTextMessage?.text) {
             const sessao = sessoesTriagem[sender];
             if (sessao && grupoTriagemAtivo) {
@@ -360,7 +367,6 @@ async function startAtrinoBot() {
             }
         }
 
-        // --- captura número informado em texto ---
         if (!isGroup) {
             const sessao = sessoesTriagem[sender];
             const txt = m.message.conversation || m.message.extendedTextMessage?.text || '';
@@ -370,14 +376,12 @@ async function startAtrinoBot() {
             }
         }
 
-        // --- reset por inatividade ---
         const agoraMs = Date.now();
         if (ultimaInteracao[sender] && (agoraMs - ultimaInteracao[sender]) > 5 * 24 * 60 * 60 * 1000) {
             saldosUFSC[sender] = 0;
         }
         ultimaInteracao[sender] = agoraMs;
 
-        // --- contagem de atividade ---
         if (contagemAtiva[jid]) {
             if (!estatisticas[jid]) estatisticas[jid] = {};
             if (!estatisticas[jid][sender]) estatisticas[jid][sender] = { mensagens: 0, fotos: 0, videos: 0, figurinhas: 0, total: 0 };
@@ -389,27 +393,22 @@ async function startAtrinoBot() {
             else if (m.message.stickerMessage) ua.figurinhas++;
         }
 
-        // ============================================================
-        // COMANDOS DO PV (triagem)
-        // ============================================================
+        // --- COMANDOS PV ---
         if (!isGroup && body.startsWith('.')) {
             const pvArgs    = body.slice(1).trim().split(/ +/);
             const pvCommand = pvArgs.shift().toLowerCase();
 
             try {
-                // .triagem
                 if (pvCommand === 'triagem') {
                     if (!grupoTriagemAtivo) return sock.sendMessage(jid, { text: '⚠️ Nenhum grupo ativou a triagem no momento.' });
                     if (triagensFinalizadas.has(sender)) return sock.sendMessage(jid, { text: '❌ Você já realizou sua triagem. Não é permitido enviar mais de uma vez.' });
 
                     if (!sessoesTriagem[sender]) {
                         sessoesTriagem[sender] = criarSessaoTriagem(sender, grupoTriagemAtivo);
-
-                        // EXPIRAÇÃO: 2 min sem .finalizar
                         sessoesTriagem[sender]._expiracao = setTimeout(async () => {
                             if (sessoesTriagem[sender]) {
                                 delete sessoesTriagem[sender];
-                                triagensFinalizadas.delete(sender); // permite tentar de novo se quiser
+                                triagensFinalizadas.delete(sender);
                                 try { await sock.sendMessage(sender, { text: '⏰ Sua triagem expirou por inatividade (2 minutos sem finalizar). Se desejar, inicie novamente com *.triagem*.' }); } catch {}
                                 try { await sock.sendMessage(grupoTriagemAtivo, { text: `⏰ Triagem de *${sender.split('@')[0]}* expirou por inatividade (2 min sem .finalizar).` }); } catch {}
                             }
@@ -424,13 +423,11 @@ async function startAtrinoBot() {
                     });
                 }
 
-                // .finalizar
                 if (pvCommand === 'finalizar') {
                     const sessao = sessoesTriagem[sender];
                     if (!sessao) return sock.sendMessage(jid, { text: '⚠️ Você ainda não iniciou uma triagem. Envie *.triagem* primeiro.' });
                     if (!grupoTriagemAtivo) { delete sessoesTriagem[sender]; return sock.sendMessage(jid, { text: '⚠️ Nenhum grupo está recebendo triagens no momento.' }); }
 
-                    // cancela expiração
                     if (sessao._expiracao) { clearTimeout(sessao._expiracao); delete sessao._expiracao; }
 
                     const numeroExibir = sessao.numeroInformado || sender.split('@')[0];
@@ -440,7 +437,6 @@ async function startAtrinoBot() {
                     contadorTicket++;
                     const ticket = contadorTicket;
 
-                    // adiciona à fila pendente
                     filaPendente.push({ ticket, senderJid: sender, numeroExibir, sessao });
 
                     const posicaoFila = filaPendente.length + (filaEmAnalise ? 1 : 0);
@@ -448,7 +444,6 @@ async function startAtrinoBot() {
                         text: `✅ Triagem enviada!\n\n🎫 *Ticket: #${ticket}*\n📊 Posição na fila: *${posicaoFila}º*\n\n⏳ Você será notificado(a) assim que sua triagem for analisada.`
                     });
 
-                    // se não tem nenhuma em análise, envia imediatamente
                     if (!filaEmAnalise) await enviarProximaTriagemAoGrupo(sock);
                     return;
                 }
@@ -461,7 +456,6 @@ async function startAtrinoBot() {
 
         if (!isGroup) return;
 
-        // --- anagrama ---
         if (anagramaGame.ativo && anagramaGame.jid === jid && body.toLowerCase() === anagramaGame.palavra) {
             saldosUFSC[sender] = (saldosUFSC[sender] || 0) + 1;
             await sock.sendMessage(jid, { text: `🎉 *ACERTOU!* @${sender.split('@')[0]} ganhou 1 UFSC! 💰 Saldo: ${saldosUFSC[sender]}`, mentions: [sender] });
@@ -470,7 +464,6 @@ async function startAtrinoBot() {
             return sock.sendMessage(jid, { text: `🧩 *${anagramaGame.embaralhada}*` });
         }
 
-        // --- mutados ---
         if (mutados.includes(sender)) {
             try {
                 await sock.sendMessage(jid, { delete: m.key });
@@ -499,7 +492,6 @@ async function startAtrinoBot() {
             await sock.sendMessage(jid, { text: `📢 *Chamada Geral!*`, mentions: meta.participants.map(p => p.id) });
         }
 
-        // --- CAPTURA ESCOLHA DE HORÁRIO (resposta numérica após .login_triagem) ---
         if (adminsTriagem[sender]?._aguardandoEscolha && /^[1-6]$/.test(body.trim())) {
             const dadosAdm = adminsTriagem[sender];
             const idx = parseInt(body.trim()) - 1;
@@ -554,10 +546,6 @@ async function startAtrinoBot() {
         if (botSilenciado) return;
 
         switch (command) {
-
-            // --------------------------------------------------------
-            // MENU
-            // --------------------------------------------------------
             case 'menu':
                 if (!isSenderAdmin) return sock.sendMessage(jid, { text: '❌ Apenas administradores.' }, { quoted: m });
                 await sock.sendMessage(jid, { text: `╭─── [ ATRINO BOT ] ───╮
@@ -600,9 +588,6 @@ async function startAtrinoBot() {
 ╰───────────────────╯` + logComando, mentions: [sender] }, { quoted: m });
                 break;
 
-            // --------------------------------------------------------
-            // TRIAGEM — ATIVAR / DESATIVAR
-            // --------------------------------------------------------
             case 'ativar_triagem':
                 if (!isSenderAdmin) return;
                 grupoTriagemAtivo = jid;
@@ -623,9 +608,6 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: '🔒 Triagem desativada.' }, { quoted: m });
                 break;
 
-            // --------------------------------------------------------
-            // FILA
-            // --------------------------------------------------------
             case 'ativar_fila':
                 if (!isSenderAdmin) return;
                 filaAtiva = true;
@@ -650,15 +632,9 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: `✅ Link registrado:\n🔗 ${linkGrupoTriagem}` }, { quoted: m });
                 break;
 
-            // --------------------------------------------------------
-            // ADMINS DE TRIAGEM — CADASTRO
-            // .registrar_adm @mention apelido senha
-            // --------------------------------------------------------
             case 'registrar_adm': {
                 if (!isSenderAdmin) return;
                 const alvoCadastro = getMention();
-                // args[0] pode ser o @menção (já processada), args restantes: apelido senha
-                // formato: .registrar_adm @jid apelido senha
                 const apelidoCadastro = args[1] || args[0];
                 const senhaCadastro   = args[2] || args[1];
 
@@ -682,10 +658,6 @@ async function startAtrinoBot() {
                 break;
             }
 
-            // --------------------------------------------------------
-            // LOGIN DE TRIAGEM
-            // .login_triagem senha
-            // --------------------------------------------------------
             case 'login_triagem': {
                 const senhaLogin = args[0];
                 if (!senhaLogin) return sock.sendMessage(jid, { text: '❌ Uso: *.login_triagem <sua_senha>*' }, { quoted: m });
@@ -707,19 +679,14 @@ async function startAtrinoBot() {
                     _slots: slots
                 }, { quoted: m });
 
-                // armazena slots temporariamente para capturar resposta
                 admDados._slotsDisponiveis = slots;
                 admDados._aguardandoEscolha = true;
                 break;
             }
 
-            // --------------------------------------------------------
-            // APROVAR / REPROVAR
-            // --------------------------------------------------------
             case 'aprovar': {
                 if (!isSenderAdmin) return;
 
-                // verifica se quem aprova é o adm de plantão (ou dono)
                 if (sessaoTriagemResponsavel && sender !== sessaoTriagemResponsavel &&
                     sender !== DONO_SUPREMO && sender !== DONO_ADMIN) {
                     const respApelido = adminsTriagem[sessaoTriagemResponsavel]?.apelido || 'outro adm';
@@ -736,12 +703,10 @@ async function startAtrinoBot() {
                 entrada.status = 'aprovado';
                 filaEmAnalise = null;
 
-                // contabiliza meta
                 if (adminsTriagem[sender]) adminsTriagem[sender].aprovacoes++;
 
                 await sock.sendMessage(jid, { text: `✅ Ticket #${ticketAprovar} *APROVADO!*\n📱 ${entrada.numeroExibir}` }, { quoted: m });
 
-                // notifica membro no PV
                 try {
                     const responsavelApelido = sessaoTriagemResponsavel && adminsTriagem[sessaoTriagemResponsavel]
                         ? adminsTriagem[sessaoTriagemResponsavel].apelido : 'Equipe';
@@ -751,12 +716,10 @@ async function startAtrinoBot() {
                     setTimeout(async () => { try { await sock.chatModify({ clear: { before: new Date() } }, entrada.senderJid); } catch {} }, 3 * 60 * 1000);
                 } catch {}
 
-                // notifica posição dos que aguardam na fila pendente
                 for (let i = 0; i < filaPendente.length; i++) {
                     try { await sock.sendMessage(filaPendente[i].senderJid, { text: `📊 *ATUALIZAÇÃO*\n\nTicket #${filaPendente[i].ticket} — Posição: *${i + 2}º*\n⏳ Aguarde.` }); } catch {}
                 }
 
-                // avisa sobre meta
                 if (adminsTriagem[sender]) {
                     const total = adminsTriagem[sender].aprovacoes + adminsTriagem[sender].reprovacoes;
                     if (total === metaTriagens) {
@@ -764,7 +727,6 @@ async function startAtrinoBot() {
                     }
                 }
 
-                // envia próxima da fila
                 await enviarProximaTriagemAoGrupo(sock);
                 break;
             }
@@ -816,9 +778,6 @@ async function startAtrinoBot() {
                 break;
             }
 
-            // --------------------------------------------------------
-            // METAS
-            // --------------------------------------------------------
             case 'metas': {
                 if (!isSenderAdmin) return;
                 const admLista = Object.entries(adminsTriagem);
@@ -850,9 +809,6 @@ async function startAtrinoBot() {
                 break;
             }
 
-            // --------------------------------------------------------
-            // TIKTOK ALERT
-            // --------------------------------------------------------
             case 'alert_tiktok': {
                 if (!isSenderAdmin) return;
                 const inputTk = args[0];
@@ -877,9 +833,6 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: `🔕 Alerta de *@${usernameRem}* removido.` }, { quoted: m });
                 break;
 
-            // --------------------------------------------------------
-            // REGISTRAR / DESATIVAR BOT
-            // --------------------------------------------------------
             case 'registrar':
                 if (gruposRegistrados.includes(jid)) return sock.sendMessage(jid, { text: '✅ Grupo já registrado!' }, { quoted: m });
                 if (!senhaRegistro || args[0] !== senhaRegistro) return sock.sendMessage(jid, { text: `⚠️ Senha inválida.\n🔗 https://servidor-jct9.onrender.com/` }, { quoted: m });
@@ -901,9 +854,6 @@ async function startAtrinoBot() {
                 setTimeout(async () => { try { await sock.sendMessage(jid, { text: '👋 Saindo...' }); await sock.groupLeave(jid); } catch {} }, 300000);
                 break;
 
-            // --------------------------------------------------------
-            // MODERAÇÃO
-            // --------------------------------------------------------
             case 'tornaadm': {
                 if (!isSenderAdmin) return;
                 const userToAdmin = getMention();
@@ -1169,7 +1119,7 @@ async function startAtrinoBot() {
                     let t2 = body.toLowerCase().includes('@eu') ? mentM[0] : mentM[1];
                     if (!t1 || !t2 || t1 === t2) return sock.sendMessage(jid, { text: '❌ Use: .mat @eu @pessoa ou .mat @p1 @p2' }, { quoted: m });
                     const p = Math.floor(Math.random() * 101);
-                    const c = p > 75 ? '❤️‍🔥' : p > 50 ? '💖' : p > 25 ? '🧡' : '💔';
+                    const c = p > 75 ? '❤️‍®️' : p > 50 ? '💖' : p > 25 ? '🧡' : '💔';
                     const f = p > 85 ? 'UM CASAL LENDÁRIO!' : p > 60 ? '💖 Tem futuro!' : p > 40 ? '⚖️ Pode rolar...' : '📉 Melhor na amizade.';
                     saldosUFSC[sender] -= precoFigurinha;
                     await sock.sendMessage(jid, { text: `💘 *ORÁCULO DO AMOR*\n\n@${t1.split('@')[0]} ${c} *${p}%* ${c} @${t2.split('@')[0]}\n\n${f}\n💰 Saldo: ${saldosUFSC[sender]}`, mentions: [t1, t2] }, { quoted: m });
