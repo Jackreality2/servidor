@@ -972,14 +972,14 @@ async function startAtrinoBot() {
             }
 
             case 'unadv': {
-                if (!isSenderAdmin) return;
-                const alvo = getMention();
-                if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
-                advertencias[alvo] = Math.max(0, (advertencias[alvo] || 0) - 1);
-                await sock.sendMessage(jid, { text: `✅ Advertência removida de @${alvo.split('@')[0]}. Total: ${advertencias[alvo]}/3`, mentions: [alvo] }, { quoted: m });
-                break;
+    if (!isSenderAdmin) return;
+    const alvo = getMention();
+    if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
+    advertencias[alvo] = Math.max(0, (advertencias[alvo] || 0) - 1);
+    await sock.sendMessage(jid, { text: `✅ Advertência removida de @${alvo.split('@')[0]}. Total: ${advertencias[alvo]}/3`, mentions: [alvo] }, { quoted: m });
+    break;
 
-            case 'mute': {
+case 'mute': {
                 if (!isSenderAdmin) return;
                 const alvo = getMention();
                 if (!alvo) return sock.sendMessage(jid, { text: '❌ Marque alguém.' }, { quoted: m });
