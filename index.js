@@ -318,14 +318,15 @@ async function startAtrinoBot() {
         if (Object.keys(alertasTikTok).length > 0) await checarNovosTikToks(sock);
     });
 
-    // --- CONEXÃO E TRATAMENTO DE ERROS ---
-    sock.ev.on('connection.update', (update) => {
+    // --- CONEXÃO E TRATAMENTO DE ERROS CORRIGIDO ---
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         
         if (qr) {
             qrAtual = qr;
-            console.log('\n🔗 QR: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(qr));
-            qrcode.generate(qr, { small: false });
+            console.log('\n🔗 Novo QR Code gerado. Escaneie pelo navegador ou terminal:');
+            console.log('https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(qr));
+            qrcode.generate(qr, { small: true });
         }
 
         if (connection === 'open') {
@@ -336,19 +337,34 @@ async function startAtrinoBot() {
         if (connection === 'close') {
             qrAtual = null;
             const error = lastDisconnect?.error;
-            const statusCode = new Boom(error)?.output?.statusCode;
+            const statusCode = error instanceof Boom ? error.output?.statusCode : error?.output?.statusCode;
 
             console.log(`❌ Conexão fechada. Motivo / StatusCode: ${statusCode}`);
-            if (error) console.log('Detalhes do erro:', error);
+            if (error) console.log('Detalhes do erro:', error?.message || error);
 
-            if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                console.log('⚠️ Sessão encerrada ou inválida. Limpando auth_info para permitir novo QR...');
+            const errosFatais = [
+                DisconnectReason.loggedOut,
+                DisconnectReason.badSession,
+                DisconnectReason.connectionReplaced,
+                401, 403, 405
+            ];
+
+            const deveLimparSessao = errosFatais.includes(statusCode);
+
+            if (deveLimparSessao) {
+                console.log('⚠️ Erro fatal/Sessão inválida detectada. Apagando pasta auth_info...');
                 if (fs.existsSync('auth_info')) {
-                    fs.rmSync('auth_info', { recursive: true, force: true });
+                    try {
+                        fs.rmSync('auth_info', { recursive: true, force: true });
+                        console.log('🧹 Pasta auth_info limpa com sucesso.');
+                    } catch (errClean) {
+                        console.error('Erro ao limpar auth_info:', errClean.message);
+                    }
                 }
+                console.log('🔄 Reiniciando bot em 5 segundos para gerar novo QR Code...');
                 setTimeout(() => startAtrinoBot(), 5000);
             } else {
-                console.log('🔄 Tentando reconectar em 5 segundos...');
+                console.log('🔄 Desconexão temporária. Tentando reconectar em 5 segundos...');
                 setTimeout(() => startAtrinoBot(), 5000);
             }
         }
@@ -629,7 +645,7 @@ async function startAtrinoBot() {
                 break;
 
             // --------------------------------------------------------
-            // TRIAGEM — ATIVAR / DESATIVAR
+            // TRIAGEM — ATIVAR / DESATIVAR / CONFIGS
             // --------------------------------------------------------
             case 'ativar_triagem':
                 if (!isSenderAdmin) return;
@@ -662,80 +678,103 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: '🔴 Fila sequencial desativada.' }, { quoted: m });
                 break;
 
-            // CORREÇÃO DO COMANDO CORTADO
             case 'registrar_link':
                 if (!isSenderAdmin) return;
-                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Envie o link do grupo. Ex: .registrar_link https://chat.whatsapp.com/...' }, { quoted: m });
-                linkGrupoTriagem = args[0];
+                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Informe o link do grupo. Ex: `.registrar_link https://chat.whatsapp.com/...`' }, { quoted: m });
+                linkGrupoTriagem = args[0].trim();
                 await syncEstadoBotToGithub();
-                await sock.sendMessage(jid, { text: `✅ Link do grupo de triagem salvo com sucesso!\n🔗 Link: ${linkGrupoTriagem}` }, { quoted: m });
+                await sock.sendMessage(jid, { text: `✅ Link registrado com sucesso:\n${linkGrupoTriagem}` }, { quoted: m });
                 break;
 
             case 'registrar_adm':
                 if (!isSenderAdmin) return;
-                const targetAdm = getMention();
-                if (!targetAdm || args.length < 2) return sock.sendMessage(jid, { text: '❌ Uso correto: .registrar_adm @membro <apelido> <senha>' }, { quoted: m });
-                const apelido = args[0].startsWith('@') ? args[1] : args[0];
-                const senha = args[args.length - 1];
-                adminsTriagem[targetAdm] = {
-                    apelido: apelido,
-                    senhaHash: hashSenha(senha),
+                const alvoAdm = getMention();
+                if (!alvoAdm) return sock.sendMessage(jid, { text: '❌ Mencione o admin. Ex: `.registrar_adm @user Apelido Senha`' }, { quoted: m });
+                const admApelido = args[1];
+                const admSenha   = args[2];
+                if (!admApelido || !admSenha) return sock.sendMessage(jid, { text: '❌ Use: `.registrar_adm @user <apelido> <senha>`' }, { quoted: m });
+                adminsTriagem[alvoAdm] = {
+                    apelido: admApelido,
+                    senhaHash: hashSenha(admSenha),
                     triagensAprovadas: 0,
                     horarioMarcado: null
                 };
-                await sock.sendMessage(jid, { text: `✅ Admin de triagem cadastrado!\n👤 Adm: @${targetAdm.split('@')[0]}\n🏷️ Apelido: ${apelido}`, mentions: [targetAdm] }, { quoted: m });
+                await sock.sendMessage(jid, { text: `✅ Admin de triagem cadastrado!\n👤 Apelido: *${admApelido}*` }, { quoted: m });
                 break;
 
             case 'login_triagem':
-                const adm = adminsTriagem[sender];
-                if (!adm) return sock.sendMessage(jid, { text: '❌ Você não está cadastrado como admin de triagem.' }, { quoted: m });
-                if (!args[0] || hashSenha(args[0]) !== adm.senhaHash) return sock.sendMessage(jid, { text: '❌ Senha incorreta.' }, { quoted: m });
+                const senhaDig = args[0];
+                if (!senhaDig) return sock.sendMessage(jid, { text: '❌ Use: `.login_triagem <senha>`' }, { quoted: m });
+                const dadosAdm = adminsTriagem[sender];
+                if (!dadosAdm) return sock.sendMessage(jid, { text: '❌ Você não está cadastrado como admin de triagem.' }, { quoted: m });
+                if (dadosAdm.senhaHash !== hashSenha(senhaDig)) return sock.sendMessage(jid, { text: '❌ Senha incorreta!' }, { quoted: m });
 
                 const slots = gerarHorariosDisponiveis();
-                adm._aguardandoEscolha = true;
-                adm._slotsDisponiveis = slots;
+                dadosAdm._aguardandoEscolha = true;
+                dadosAdm._slotsDisponiveis  = slots;
 
-                let txtSlots = `✅ *Login efetuado com sucesso, ${adm.apelido}!*\n\nEscolha seu horário de plantão respondendo com o número:\n\n`;
-                slots.forEach((s, idx) => { txtSlots += `${idx + 1}️⃣ - ${s}\n`; });
-
-                await sock.sendMessage(jid, { text: txtSlots }, { quoted: m });
+                let txtLogin = `✅ *Login efetuado com sucesso, ${dadosAdm.apelido}!*\n\nSelecione seu horário de plantão respondendo com o *número (1 a 6)*:\n\n`;
+                slots.forEach((s, idx) => { txtLogin += `${idx + 1}️⃣ ${s}\n`; });
+                await sock.sendMessage(jid, { text: txtLogin }, { quoted: m });
                 break;
 
             case 'aprovar':
-                if (!isSenderAdmin && sessaoTriagemResponsavel !== sender) return sock.sendMessage(jid, { text: '❌ Apenas o responsável pelo plantão ou admin pode aprovar.' }, { quoted: m });
-                if (!filaEmAnalise) return sock.sendMessage(jid, { text: '⚠️ Nenhuma triagem na fila no momento.' }, { quoted: m });
+                if (!isSenderAdmin && !adminsTriagem[sender]) return;
                 const ticketAprovar = parseInt(args[0]);
-                if (isNaN(ticketAprovar) || filaEmAnalise.ticket !== ticketAprovar) return sock.sendMessage(jid, { text: `❌ Ticket inválido. O ticket em análise é #${filaEmAnalise.ticket}` }, { quoted: m });
+                if (!ticketAprovar) return sock.sendMessage(jid, { text: '❌ Informe o ticket. Ex: `.aprovar 1`' }, { quoted: m });
 
-                const aprovadoJid = filaEmAnalise.senderJid;
-                if (adminsTriagem[sender]) adminsTriagem[sender].triagensAprovadas++;
+                if (filaEmAnalise && filaEmAnalise.ticket === ticketAprovar) {
+                    const ticketObj = filaEmAnalise;
+                    filaEmAnalise = null;
 
-                await sock.sendMessage(aprovadoJid, { text: `🎉 *PARABÉNS! SUAS FOTOS E ÁUDIOS FORAM APROVADOS!*\n\nEntra nesse grupo para fazer a verificação por ligação de vídeo com a adm:\n🔗 ${linkGrupoTriagem || 'Link não configurado'}` });
-                await sock.sendMessage(jid, { text: `✅ Triagem #${ticketAprovar} *APROVADA* com sucesso!` }, { quoted: m });
+                    if (adminsTriagem[sender]) adminsTriagem[sender].triagensAprovadas++;
 
-                filaEmAnalise = null;
-                await enviarProximaTriagemAoGrupo(sock);
+                    await sock.sendMessage(jid, { text: `✅ *Triagem #${ticketAprovar} APROVADA!*` }, { quoted: m });
+
+                    try {
+                        let msgAprovado = `🎉 *Sua triagem foi APROVADA!*`;
+                        if (linkGrupoTriagem) msgAprovado += `\n\nEntre no grupo pelo link:\n${linkGrupoTriagem}`;
+                        await sock.sendMessage(ticketObj.senderJid, { text: msgAprovado });
+                    } catch {}
+
+                    await enviarProximaTriagemAoGrupo(sock);
+                } else {
+                    sock.sendMessage(jid, { text: `⚠️ Ticket #${ticketAprovar} não está em análise no topo da fila.` }, { quoted: m });
+                }
                 break;
 
             case 'reprovar':
-                if (!isSenderAdmin && sessaoTriagemResponsavel !== sender) return sock.sendMessage(jid, { text: '❌ Apenas o responsável pelo plantão ou admin pode reprovar.' }, { quoted: m });
-                if (!filaEmAnalise) return sock.sendMessage(jid, { text: '⚠️ Nenhuma triagem na fila no momento.' }, { quoted: m });
+                if (!isSenderAdmin && !adminsTriagem[sender]) return;
                 const ticketReprovar = parseInt(args[0]);
-                if (isNaN(ticketReprovar) || filaEmAnalise.ticket !== ticketReprovar) return sock.sendMessage(jid, { text: `❌ Ticket inválido. O ticket em análise é #${filaEmAnalise.ticket}` }, { quoted: m });
+                if (!ticketReprovar) return sock.sendMessage(jid, { text: '❌ Informe o ticket. Ex: `.reprovar 1`' }, { quoted: m });
 
-                const reprovadoJid = filaEmAnalise.senderJid;
-                await sock.sendMessage(reprovadoJid, { text: `❌ Sua triagem não foi aprovada pela nossa equipe.` });
-                await sock.sendMessage(jid, { text: `🔴 Triagem #${ticketReprovar} *REPROVADA*.` }, { quoted: m });
+                if (filaEmAnalise && filaEmAnalise.ticket === ticketReprovar) {
+                    const ticketObj = filaEmAnalise;
+                    filaEmAnalise = null;
 
-                filaEmAnalise = null;
-                await enviarProximaTriagemAoGrupo(sock);
+                    await sock.sendMessage(jid, { text: `❌ *Triagem #${ticketReprovar} REPROVADA!*` }, { quoted: m });
+
+                    try {
+                        await sock.sendMessage(ticketObj.senderJid, { text: `❌ Sua triagem não foi aprovada. Entre em contato com a administração.` });
+                    } catch {}
+
+                    await enviarProximaTriagemAoGrupo(sock);
+                } else {
+                    sock.sendMessage(jid, { text: `⚠️ Ticket #${ticketReprovar} não está em análise no topo da fila.` }, { quoted: m });
+                }
                 break;
 
             case 'metas':
                 if (!isSenderAdmin) return;
-                let txtMetas = `📊 *PAINEL DE METAS DE TRIAGEM*\n\nTarget Meta: *${metaTriagens}*\n\n`;
-                for (const [admJid, info] of Object.entries(adminsTriagem)) {
-                    txtMetas += `👤 *${info.apelido}*: ${info.triagensAprovadas}/${metaTriagens} triagens aprovadas.\n`;
+                let txtMetas = `📊 *PAINEL DE METAS DE TRIAGEM*\n🎯 Meta atual: *${metaTriagens} triagens*\n\n`;
+                if (Object.keys(adminsTriagem).length === 0) {
+                    txtMetas += `Nenhum admin cadastrado.`;
+                } else {
+                    for (const [admJid, admData] of Object.entries(adminsTriagem)) {
+                        const pct = Math.min(100, Math.round((admData.triagensAprovadas / metaTriagens) * 100));
+                        const barra = '🟩'.repeat(Math.floor(pct / 10)) + '⬜'.repeat(10 - Math.floor(pct / 10));
+                        txtMetas += `👤 *${admData.apelido}*\n Progresso: ${admData.triagensAprovadas}/${metaTriagens} [${pct}%]\n ${barra}\n\n`;
+                    }
                 }
                 await sock.sendMessage(jid, { text: txtMetas }, { quoted: m });
                 break;
@@ -743,38 +782,96 @@ async function startAtrinoBot() {
             case 'alterar_meta':
                 if (!isSenderAdmin) return;
                 const novaMeta = parseInt(args[0]);
-                if (isNaN(novaMeta)) return sock.sendMessage(jid, { text: '❌ Informe um número válido.' }, { quoted: m });
+                if (!novaMeta || novaMeta <= 0) return sock.sendMessage(jid, { text: '❌ Informe um número válido.' }, { quoted: m });
                 metaTriagens = novaMeta;
-                await sock.sendMessage(jid, { text: `✅ Meta atualizada para *${metaTriagens}* triagens!` }, { quoted: m });
+                await sock.sendMessage(jid, { text: `✅ Meta de triagens alterada para *${metaTriagens}*!` }, { quoted: m });
                 break;
 
             // --------------------------------------------------------
-            // OUTROS COMANDOS DE ADMINISTRAÇÃO E UTILITÁRIOS
+            // FERRAMENTAS E OUTROS COMANDOS
             // --------------------------------------------------------
             case 'cep':
-                if (!args[0]) return sock.sendMessage(jid, { text: '❌ Digite o CEP.' }, { quoted: m });
+                const cepInput = args[0]?.replace(/\D/g, '');
+                if (!cepInput || cepInput.length !== 8) return sock.sendMessage(jid, { text: '❌ Informe um CEP válido com 8 dígitos.' }, { quoted: m });
                 try {
-                    const resCep = await axios.get(`https://viacep.com.br/ws/${args[0].replace(/\D/g, '')}/json/`);
+                    const resCep = await axios.get(`https://viacep.com.br/ws/${cepInput}/json/`);
                     if (resCep.data.erro) return sock.sendMessage(jid, { text: '❌ CEP não encontrado.' }, { quoted: m });
                     const c = resCep.data;
-                    await sock.sendMessage(jid, { text: `📍 *CEP:* ${c.cep}\n🏙️ *Cidade:* ${c.localidade}/${c.uf}\n🏡 *Bairro:* ${c.bairro}\n🛣️ *Rua:* ${c.logradouro}` }, { quoted: m });
-                } catch { sock.sendMessage(jid, { text: '❌ Erro ao consultar CEP.' }, { quoted: m }); }
+                    await sock.sendMessage(jid, { text: `📍 *CONSULTA CEP*\n\n📮 CEP: ${c.cep}\n🏙️ Cidade: ${c.localidade} - ${c.uf}\n🏡 Bairro: ${c.bairro}\n🛣️ Logradouro: ${c.logradouro}` }, { quoted: m });
+                } catch {
+                    sock.sendMessage(jid, { text: '❌ Erro ao consultar CEP.' }, { quoted: m });
+                }
                 break;
 
             case 's':
             case 'a':
-                const qMsg = m.message.extendedTextMessage?.contextInfo?.quotedMessage || m.message;
-                const mediaData = await baixarMidiaDoMensagem(sock, qMsg);
-                if (mediaData && mediaData.tipo === 'image') {
-                    const sticker = new Sticker(mediaData.buffer, {
-                        pack: 'Atrino Bot', author: 'Bot',
+                const isQuotedImage = m.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+                const isQuotedVideo = m.message.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage;
+                const isDirectImage = m.message.imageMessage;
+                const isDirectVideo = m.message.videoMessage;
+
+                const targetMessage = isQuotedImage || isQuotedVideo ? m.message.extendedTextMessage.contextInfo.quotedMessage : m.message;
+
+                if (!isQuotedImage && !isQuotedVideo && !isDirectImage && !isDirectVideo) {
+                    return sock.sendMessage(jid, { text: '❌ Envie ou responda a uma imagem/vídeo para criar a figurinha.' }, { quoted: m });
+                }
+
+                try {
+                    const mediaType = (isQuotedImage || isDirectImage) ? 'image' : 'video';
+                    const stream = await downloadContentFromMessage(targetMessage[`${mediaType}Message`], mediaType);
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                    const sticker = new Sticker(buffer, {
+                        pack: 'Atrino Bot', author: 'Atrino',
                         type: StickerTypes.FULL, quality: 70
                     });
-                    const buf = await sticker.toBuffer();
-                    await sock.sendMessage(jid, { sticker: buf }, { quoted: m });
-                } else {
-                    sock.sendMessage(jid, { text: '❌ Marque uma imagem com .s' }, { quoted: m });
+
+                    const stickerBuffer = await sticker.toBuffer();
+                    await sock.sendMessage(jid, { sticker: stickerBuffer }, { quoted: m });
+                } catch (stkErr) {
+                    console.error('Erro ao gerar figurinha:', stkErr);
+                    sock.sendMessage(jid, { text: '❌ Falha ao converter em figurinha.' }, { quoted: m });
                 }
+                break;
+
+            case 'id':
+                await sock.sendMessage(jid, { text: `🆔 ID deste grupo/chat:\n\`${jid}\`` }, { quoted: m });
+                break;
+
+            case 'totag':
+                if (!isSenderAdmin) return;
+                try {
+                    const metaGroup = await sock.groupMetadata(jid);
+                    const todos = metaGroup.participants.map(p => p.id);
+                    const aviso = args.join(' ') || 'Atenção todos!';
+                    await sock.sendMessage(jid, { text: `📢 *AVISO*\n\n${aviso}`, mentions: todos });
+                } catch {}
+                break;
+
+            case 'doar':
+                if (!isSenderAdmin) return;
+                const alvoDoacao = getMention();
+                const valorDoacao = parseInt(args[1] || args[0]);
+                if (!alvoDoacao || isNaN(valorDoacao)) return sock.sendMessage(jid, { text: '❌ Use: `.doar @user <quantidade>`' }, { quoted: m });
+                saldosUFSC[alvoDoacao] = (saldosUFSC[alvoDoacao] || 0) + valorDoacao;
+                await sock.sendMessage(jid, { text: `💰 Adicionados *${valorDoacao} UFSC* para @${alvoDoacao.split('@')[0]}!\nSaldo total: ${saldosUFSC[alvoDoacao]}`, mentions: [alvoDoacao] }, { quoted: m });
+                break;
+
+            case 'contador':
+                if (!isSenderAdmin) return;
+                contagemAtiva[jid] = !contagemAtiva[jid];
+                await sock.sendMessage(jid, { text: contagemAtiva[jid] ? '📊 Contagem de mensagens *ATIVADA*!' : '🔴 Contagem de mensagens *DESATIVADA*!' }, { quoted: m });
+                break;
+
+            case 'ranking':
+                if (!estatisticas[jid]) return sock.sendMessage(jid, { text: '⚠️ Nenhuma estatística coletada ainda. Ative com `.contador`.' }, { quoted: m });
+                const ordenados = Object.entries(estatisticas[jid]).sort((a, b) => b[1].total - a[1].total).slice(0, 10);
+                let txtRank = `🏆 *RANKING DOS MAIS ATIVOS*\n\n`;
+                ordenados.forEach(([uJid, st], idx) => {
+                    txtRank += `${idx + 1}º @${uJid.split('@')[0]} — *${st.total}* msgs (${st.mensagens} txt, ${st.fotos} fotos, ${st.figurinhas} figs)\n`;
+                });
+                await sock.sendMessage(jid, { text: txtRank, mentions: ordenados.map(x => x[0]) }, { quoted: m });
                 break;
 
             default:
@@ -783,4 +880,5 @@ async function startAtrinoBot() {
     });
 }
 
+// Iniciar Aplicação
 startAtrinoBot();
