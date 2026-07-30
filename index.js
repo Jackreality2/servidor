@@ -1,3 +1,12 @@
+// --- TRATAMENTO GLOBAL DE EXCEÇÕES (EVITA CRASH DO NODE.JS) ---
+process.on('uncaughtException', (err) => {
+    console.error('⚠️ [ESCUDO GLOBAL] Erro não capturado (evitou o crash):', err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ [ESCUDO GLOBAL] Promessa rejeitada (evitou o crash):', reason);
+});
+
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, jidNormalizedUser, downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const P = require('pino');
