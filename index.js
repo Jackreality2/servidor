@@ -242,6 +242,7 @@ http.createServer(async (req, res) => {
                 console.error("Erro ao desconectar:", err.message);
             }
         }
+        try { fs.rmSync('auth_info', { recursive: true, force: true }); } catch {}
         qrAtual = null;
         res.writeHead(302, { 'Location': '/' }); 
         res.end(); 
@@ -358,7 +359,7 @@ async function startAtrinoBot() {
         if (Object.keys(alertasTikTok).length > 0) await checarNovosTikToks(sock);
     });
 
-    // --- GERENCIAMENTO DE CONEXÃO ---
+    // --- GERENCIAMENTO DE CONEXÃO E AUTO-LIMPEZA EM CASO DE ERRO 405/401 ---
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
@@ -378,13 +379,21 @@ async function startAtrinoBot() {
 
             console.log(`⚠️ Conexão fechada. Motivo: ${statusCode}`);
 
-            const deveReconectar = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
+            // Se for erro de sessão inválida/deslogada (401, 405 ou LoggedOut)
+            const sessaoInvalida = statusCode === DisconnectReason.loggedOut || statusCode === 401 || statusCode === 405;
 
-            if (deveReconectar) { 
+            if (sessaoInvalida) {
+                console.log('❌ Sessão expirada ou revogada. Apagando pasta auth_info...');
+                try {
+                    fs.rmSync('auth_info', { recursive: true, force: true });
+                } catch (err) {
+                    console.error('Erro ao remover auth_info:', err.message);
+                }
+                console.log('🔄 Reiniciando bot para gerar novo QR Code...');
+                startAtrinoBot();
+            } else {
                 console.log('🔄 Reconectando...'); 
                 startAtrinoBot(); 
-            } else {
-                console.log('❌ Sessão encerrada/expirada. É necessário escanear um novo QR Code.');
             }
         }
     });
@@ -681,21 +690,12 @@ async function startAtrinoBot() {
                 if (!isSenderAdmin) return;
                 if (grupoTriagemAtivo !== jid) return sock.sendMessage(jid, { text: '⚠️ Triagem não está ativa aqui.' }, { quoted: m });
                 grupoTriagemAtivo = null;
-                sessaoTriagemResponsavel = null;
                 await syncEstadoBotToGithub();
-                await sock.sendMessage(jid, { text: '🔒 Triagem desativada.' }, { quoted: m });
-                break;
-
-            case 'ativar_fila':
-                if (!isSenderAdmin) return;
-                filaAtiva = true;
-                filaPendente.length = 0;
-                filaEmAnalise = null;
-                contadorTicket = 0;
-                await sock.sendMessage(jid, { text: '🔢 *FILA SEQUENCIAL ATIVADA!*\n\nAs triagens serão enviadas 1 por vez.\nUse *.aprovar* ou *.reprovar* para avançar.' }, { quoted: m });
+                await sock.sendMessage(jid, { text: '🛑 Triagem desativada.' }, { quoted: m });
                 break;
         }
     });
 }
 
+// Inicia o bot
 startAtrinoBot();
