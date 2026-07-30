@@ -272,6 +272,12 @@ function gerarHorariosDisponiveis() {
 
 async function startAtrinoBot() {
     await loadEstadoBotFromGithub();
+
+    // Garante existência do diretório auth_info
+    if (!fs.existsSync('auth_info')) {
+        fs.mkdirSync('auth_info', { recursive: true });
+    }
+
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
     const sock = makeWASocket({
@@ -322,19 +328,39 @@ async function startAtrinoBot() {
         if (Object.keys(alertasTikTok).length > 0) await checarNovosTikToks(sock);
     });
 
+    // --- CONEXÃO E TRATAMENTO DE ERROS ---
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
+        
         if (qr) {
             qrAtual = qr;
             console.log('\n🔗 QR: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(qr));
             qrcode.generate(qr, { small: false });
         }
-        if (connection === 'open') { qrAtual = null; console.log('\n✅ ATRINO BOT ONLINE!\n'); }
+
+        if (connection === 'open') {
+            qrAtual = null;
+            console.log('\n✅ ATRINO BOT ONLINE E CONECTADO COM SUCESSO!\n');
+        }
+
         if (connection === 'close') {
             qrAtual = null;
-            const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-            if (reason !== DisconnectReason.loggedOut) { console.log('🔄 Reconectando...'); startAtrinoBot(); }
-            else console.log('❌ Sessão encerrada permanentemente.');
+            const error = lastDisconnect?.error;
+            const statusCode = new Boom(error)?.output?.statusCode;
+
+            console.log(`❌ Conexão fechada. Motivo / StatusCode: ${statusCode}`);
+            if (error) console.log('Detalhes do erro:', error);
+
+            if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+                console.log('⚠️ Sessão encerrada ou inválida. Limpando auth_info para permitir novo QR...');
+                if (fs.existsSync('auth_info')) {
+                    fs.rmSync('auth_info', { recursive: true, force: true });
+                }
+                setTimeout(() => startAtrinoBot(), 5000);
+            } else {
+                console.log('🔄 Tentando reconectar em 5 segundos...');
+                setTimeout(() => startAtrinoBot(), 5000);
+            }
         }
     });
 
@@ -345,7 +371,7 @@ async function startAtrinoBot() {
         const m = messages[0];
         if (!m.message || m.key.fromMe) return;
 
-        const jid    = m.key.remoteJid;
+        const jid     = m.key.remoteJid;
         const isGroup = jid.endsWith('@g.us');
         const sender  = m.key.participant || m.key.remoteJid;
         const body    = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || '');
@@ -652,229 +678,8 @@ async function startAtrinoBot() {
                 filaAtiva = false;
                 await sock.sendMessage(jid, { text: '🔴 Fila sequencial desativada.' }, { quoted: m });
                 break;
-
-            case 'registrar_link':
-                if (!isSenderAdmin) return;
-                if (!args[0]) return sock.sendMessage(jid, { text: '⚠️ Uso: .registrar_link <link_do_grupo>' }, { quoted: m });
-                linkGrupoTriagem = args[0];
-                await sock.sendMessage(jid, { text: `✅ Link de acesso configurado: ${linkGrupoTriagem}` }, { quoted: m });
-                break;
-
-            // --------------------------------------------------------
-            // GESTÃO DE ADMINS DE TRIAGEM
-            // --------------------------------------------------------
-            case 'registrar_adm':
-                if (!isSenderAdmin) return;
-                {
-                    const target = getMention();
-                    const apelido = args[1];
-                    const senha = args[2];
-                    if (!target || !apelido || !senha) {
-                        return sock.sendMessage(jid, { text: '⚠️ Uso: .registrar_adm @membro <apelido> <senha>' }, { quoted: m });
-                    }
-                    adminsTriagem[target] = {
-                        apelido,
-                        senhaHash: hashSenha(senha),
-                        loginAtivo: false,
-                        horarioMarcado: null,
-                        triagensFeitas: 0,
-                        aprovacoes: 0,
-                        reprovacoes: 0
-                    };
-                    await sock.sendMessage(jid, { text: `✅ Adm de triagem *${apelido}* cadastrado com sucesso!`, mentions: [target] }, { quoted: m });
-                }
-                break;
-
-            case 'login_triagem':
-                {
-                    const dadosAdm = adminsTriagem[sender];
-                    if (!dadosAdm) return sock.sendMessage(jid, { text: '❌ Você não possui cadastro como Adm de Triagem.' }, { quoted: m });
-                    if (!args[0] || hashSenha(args[0]) !== dadosAdm.senhaHash) {
-                        return sock.sendMessage(jid, { text: '❌ Senha incorreta.' }, { quoted: m });
-                    }
-
-                    dadosAdm.loginAtivo = true;
-                    const slots = gerarHorariosDisponiveis();
-                    dadosAdm._slotsDisponiveis = slots;
-                    dadosAdm._aguardandoEscolha = true;
-
-                    let msg = `🔓 *Login efetuado com sucesso, ${dadosAdm.apelido}!*\n\nEscolha seu horário de plantão respondendo com o número:\n\n`;
-                    slots.forEach((s, idx) => { msg += `*${idx + 1}* - ${s}\n`; });
-                    await sock.sendMessage(jid, { text: msg }, { quoted: m });
-                }
-                break;
-
-            // --------------------------------------------------------
-            // APROVAÇÃO E REPROVAÇÃO DA TRIAGEM
-            // --------------------------------------------------------
-            case 'aprovar':
-                if (sessaoTriagemResponsavel && sender !== sessaoTriagemResponsavel && !isSenderAdmin) {
-                    return sock.sendMessage(jid, { text: '❌ Apenas o Adm de plantão responsável pode realizar ações no ticket atual.' }, { quoted: m });
-                }
-                {
-                    const ticketNum = parseInt(args[0]);
-                    if (!filaEmAnalise || filaEmAnalise.ticket !== ticketNum) {
-                        return sock.sendMessage(jid, { text: '❌ Este ticket não está em análise no momento.' }, { quoted: m });
-                    }
-
-                    const targetJid = filaEmAnalise.senderJid;
-                    const msgAprovado = linkGrupoTriagem
-                        ? `🎉 *Sua triagem foi APROVADA!*\n\nAcesse o grupo pelo link:\n${linkGrupoTriagem}`
-                        : `🎉 *Sua triagem foi APROVADA!* Aguarde a adição ao grupo.`;
-
-                    try { await sock.sendMessage(targetJid, { text: msgAprovado }); } catch {}
-
-                    if (adminsTriagem[sender]) {
-                        adminsTriagem[sender].triagensFeitas++;
-                        adminsTriagem[sender].aprovacoes++;
-                    }
-
-                    await sock.sendMessage(jid, { text: `✅ Triagem *#${ticketNum}* APROVADA por @${sender.split('@')[0]}!`, mentions: [sender] });
-
-                    filaEmAnalise = null;
-                    await enviarProximaTriagemAoGrupo(sock);
-                }
-                break;
-
-            case 'reprovar':
-                if (sessaoTriagemResponsavel && sender !== sessaoTriagemResponsavel && !isSenderAdmin) {
-                    return sock.sendMessage(jid, { text: '❌ Apenas o Adm de plantão responsável pode realizar ações no ticket atual.' }, { quoted: m });
-                }
-                {
-                    const ticketNum = parseInt(args[0]);
-                    if (!filaEmAnalise || filaEmAnalise.ticket !== ticketNum) {
-                        return sock.sendMessage(jid, { text: '❌ Este ticket não está em análise no momento.' }, { quoted: m });
-                    }
-
-                    const targetJid = filaEmAnalise.senderJid;
-                    try { await sock.sendMessage(targetJid, { text: `❌ Sua triagem foi *REPROVADA*. Tente novamente mais tarde cumprindo os requisitos.` }); } catch {}
-
-                    if (adminsTriagem[sender]) {
-                        adminsTriagem[sender].triagensFeitas++;
-                        adminsTriagem[sender].reprovacoes++;
-                    }
-
-                    await sock.sendMessage(jid, { text: `❌ Triagem *#${ticketNum}* REPROVADA por @${sender.split('@')[0]}.`, mentions: [sender] });
-
-                    filaEmAnalise = null;
-                    await enviarProximaTriagemAoGrupo(sock);
-                }
-                break;
-
-            // --------------------------------------------------------
-            // METAS E PAINEL DA TRIAGEM
-            // --------------------------------------------------------
-            case 'metas':
-                if (!isSenderAdmin) return;
-                {
-                    let txtMetas = `📊 *PAINEL DE METAS DE TRIAGEM*\n🎯 Meta atual por sessão: *${metaTriagens}*\n\n`;
-                    if (Object.keys(adminsTriagem).length === 0) {
-                        txtMetas += '_Nenhum adm cadastrado._';
-                    } else {
-                        for (const [admJid, data] of Object.entries(adminsTriagem)) {
-                            txtMetas += `👤 *${data.apelido}* (@${admJid.split('@')[0]})\n`;
-                            txtMetas += `   ├ Feitas: ${data.triagensFeitas}/${metaTriagens}\n`;
-                            txtMetas += `   ├ ✅ Aprovadas: ${data.aprovacoes}\n`;
-                            txtMetas += `   └ ❌ Reprovadas: ${data.reprovacoes}\n\n`;
-                        }
-                    }
-                    await sock.sendMessage(jid, { text: txtMetas, mentions: Object.keys(adminsTriagem) }, { quoted: m });
-                }
-                break;
-
-            case 'alterar_meta':
-                if (!isSenderAdmin) return;
-                {
-                    const novaMeta = parseInt(args[0]);
-                    if (isNaN(novaMeta) || novaMeta <= 0) return sock.sendMessage(jid, { text: '❌ Informe um número válido para a meta.' }, { quoted: m });
-                    metaTriagens = novaMeta;
-                    await sock.sendMessage(jid, { text: `🎯 Meta de triagens atualizada para *${metaTriagens}*!` }, { quoted: m });
-                }
-                break;
-
-            // --------------------------------------------------------
-            // OUTROS COMANDOS DE ADMINISTRAÇÃO E UTILITÁRIOS
-            // --------------------------------------------------------
-            case 'id':
-                await sock.sendMessage(jid, { text: `🆔 ID do Chat: *${jid}*` }, { quoted: m });
-                break;
-
-            case 'cep':
-                if (!args[0]) return sock.sendMessage(jid, { text: '⚠️ Informe o CEP.' }, { quoted: m });
-                try {
-                    const res = await axios.get(`https://viacep.com.br/ws/${args[0].replace(/\D/g, '')}/json/`);
-                    if (res.data.erro) return sock.sendMessage(jid, { text: '❌ CEP não encontrado.' }, { quoted: m });
-                    const c = res.data;
-                    await sock.sendMessage(jid, { text: `📍 *Endereço:*\n${c.logradouro}, ${c.bairro}\n${c.localidade} - ${c.uf}` }, { quoted: m });
-                } catch {
-                    await sock.sendMessage(jid, { text: '❌ Erro ao consultar CEP.' }, { quoted: m });
-                }
-                break;
-
-            case 'doar':
-                if (!isSenderAdmin) return;
-                {
-                    const target = getMention();
-                    const val = parseInt(args[1]);
-                    if (!target || isNaN(val)) return sock.sendMessage(jid, { text: '⚠️ Uso: .doar @membro <quantidade>' }, { quoted: m });
-                    saldosUFSC[target] = (saldosUFSC[target] || 0) + val;
-                    await sock.sendMessage(jid, { text: `💰 Transferidos *${val} UFSC* para @${target.split('@')[0]}!`, mentions: [target] }, { quoted: m });
-                }
-                break;
-
-            case 'totag':
-                if (!isSenderAdmin) return;
-                {
-                    const meta = await sock.groupMetadata(jid);
-                    await sock.sendMessage(jid, { text: args.join(' ') || '📢 Atenção!', mentions: meta.participants.map(p => p.id) });
-                }
-                break;
-
-            case 'mute':
-                if (!isSenderAdmin) return;
-                {
-                    const target = getMention();
-                    if (!target) return sock.sendMessage(jid, { text: '⚠️ Mencione alguém para mutar.' }, { quoted: m });
-                    if (!mutados.includes(target)) mutados.push(target);
-                    await sock.sendMessage(jid, { text: `🔇 @${target.split('@')[0]} foi mutado.`, mentions: [target] }, { quoted: m });
-                }
-                break;
-
-            case 'desmute':
-                if (!isSenderAdmin) return;
-                {
-                    const target = getMention();
-                    if (!target) return sock.sendMessage(jid, { text: '⚠️ Mencione alguém para desmutar.' }, { quoted: m });
-                    mutados = mutados.filter(x => x !== target);
-                    delete advertencias[target];
-                    await sock.sendMessage(jid, { text: `🔊 @${target.split('@')[0]} foi desmutado.`, mentions: [target] }, { quoted: m });
-                }
-                break;
-
-            case 'ban':
-                if (!isSenderAdmin) return;
-                {
-                    const target = getMention();
-                    if (!target) return sock.sendMessage(jid, { text: '⚠️ Mencione quem deseja remover.' }, { quoted: m });
-                    await sock.groupParticipantsUpdate(jid, [target], 'remove');
-                    await sock.sendMessage(jid, { text: `🚪 @${target.split('@')[0]} foi removido!`, mentions: [target] }, { quoted: m });
-                }
-                break;
-
-            case 'abrir':
-                if (!isSenderAdmin) return;
-                await sock.groupSettingUpdate(jid, 'not_announcement');
-                await sock.sendMessage(jid, { text: '🔓 Grupo aberto para mensagens.' }, { quoted: m });
-                break;
-
-            case 'fechar':
-                if (!isSenderAdmin) return;
-                await sock.groupSettingUpdate(jid, 'announcement');
-                await sock.sendMessage(jid, { text: '🔒 Grupo fechado. Apenas admins enviam mensagens.' }, { quoted: m });
-                break;
         }
     });
 }
 
-// --- INICIALIZAÇÃO DO BOT ---
 startAtrinoBot();
