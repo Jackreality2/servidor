@@ -51,25 +51,28 @@ const sessoesTriagem = {};
 const triagensFinalizadas = new Set();
 
 // ============================================================
+// NOVO: STATUS REAL DA CONEXÃO (para a página não mentir)
+// 'conectado' | 'desconectado' | 'aguardando_qr'
+// ============================================================
+let statusConexao = 'desconectado';
+let ultimoPingRecebido = Date.now();
+
+// ============================================================
 // NOVO: SISTEMA ANTI-FLOOD
-// floodAtivo[jid] = true/false -> proteção ligada no grupo
-// floodContagem[jid|sender|hash] = { count, firstTime }
 // ============================================================
 let floodAtivo = {};
 let floodContagem = {};
-const FLOOD_LIMITE = 5;           // +5 = remove
-const FLOOD_JANELA = 5 * 60 * 1000; // janela de 5 min
+const FLOOD_LIMITE = 5;
+const FLOOD_JANELA = 5 * 60 * 1000;
 
 // ============================================================
 // NOVO: RASTREAMENTO DE MENSAGENS PARA .apagar
-// mensagensRastreadas[jid][sender] = [ { key, time } ]
 // ============================================================
 const mensagensRastreadas = {};
-const LIMITE_RASTRO = 500; // últimas 500 msgs por usuário por grupo
+const LIMITE_RASTRO = 500;
 
 // ============================================================
-// NOVO: .pickall - confirmação por senha 1717
-// pickallPendente[jid] = { sender, timestamp }
+// NOVO: .pickall
 // ============================================================
 let pickallPendente = {};
 const SENHA_PICKALL = '1717';
@@ -182,7 +185,7 @@ function gerarAnagrama() {
 }
 
 // ============================================================
-// FILA SEQUENCIAL — envia próxima triagem ao grupo
+// FILA SEQUENCIAL
 // ============================================================
 async function enviarProximaTriagemAoGrupo(sockInstance) {
     if (filaEmAnalise) return;
@@ -232,36 +235,144 @@ async function enviarProximaTriagemAoGrupo(sockInstance) {
 }
 
 // ============================================================
-// SERVIDOR WEB (QR + painel)
+// SERVIDOR WEB (QR + painel + STATUS + PING)
 // ============================================================
 const PORT = parseInt(process.env.PORT, 10) || 7860;
 
 http.createServer((req, res) => {
+    // --- endpoint de ping (botão da página chama aqui) ---
+    if (req.url === '/ping' || req.url === '/ping?') {
+        ultimoPingRecebido = Date.now();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, status: statusConexao, timestamp: Date.now() }));
+        return;
+    }
+
+    // --- endpoint de status (para a página checar) ---
+    if (req.url === '/status' || req.url === '/status?') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: statusConexao, temQr: !!qrAtual, ultimoPing: ultimoPingRecebido }));
+        return;
+    }
+
     if (req.url === '/gerar-senha') {
         senhaRegistro = Math.random().toString(36).substring(2, 8).toUpperCase();
         res.writeHead(302, { 'Location': '/' }); res.end(); return;
     }
+
+    // --- página sem QR: mostra status REAL + botão de ping ---
     if (!qrAtual) {
+        const statusCor = statusConexao === 'conectado' ? '#25D366' : '#ee5253';
+        const statusTxt = statusConexao === 'conectado' ? '✅ BOT ONLINE' : '⚠️ DESCONECTADO';
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(`<html><head><title>Atrino Bot</title>
-        <style>body{font-family:Arial,sans-serif;text-align:center;margin-top:80px;background:#0f0c1b;color:#00ffcc}
-        .card{background:#17142b;display:inline-block;padding:40px;border-radius:15px;border:1px solid #3d3475}
-        .btn{display:inline-block;margin-top:20px;padding:15px 30px;background:#00ffcc;color:#0f0c1b;text-decoration:none;border-radius:8px;font-weight:bold}
-        .senha{font-size:2em;background:#111;padding:10px 20px;border-radius:10px;margin:20px 0;border:2px dashed #00ffcc;display:block}</style></head>
-        <body><div class="card"><h1>🚀 Atrino Bot: Conectado!</h1>
-        ${senhaRegistro ? `<p>Senha:</p><span class="senha">${senhaRegistro}</span><p>.registrar ${senhaRegistro}</p>` : '<p style="color:#ee5253">Nenhuma senha ativa.</p>'}
-        <a href__="/gerar-senha" class="btn">🔄 GERAR SENHA</a></div></body></html>`);
+        res.end(`<!DOCTYPE html>
+<html><head><title>Atrino Bot</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{font-family:Arial,sans-serif;text-align:center;margin-top:40px;background:#0f0c1b;color:#00ffcc;padding:20px}
+.card{background:#17142b;display:inline-block;padding:30px;border-radius:15px;border:1px solid #3d3475;max-width:95vw}
+.btn{display:inline-block;margin-top:15px;padding:14px 28px;background:#00ffcc;color:#0f0c1b;text-decoration:none;border-radius:8px;font-weight:bold;border:none;cursor:pointer;font-size:16px}
+.btn:hover{background:#00d9b3}
+.btn-ping{background:#25D366;color:#fff;width:100%;margin-top:15px;padding:18px;font-size:18px;border:none;border-radius:10px;cursor:pointer;font-weight:bold}
+.btn-ping:hover{background:#1eb855}
+.btn-ping.ativo{background:#ff9800;color:#fff}
+.btn-ping.parado{background:#666;color:#aaa}
+.senha{font-size:1.8em;background:#111;padding:10px 20px;border-radius:10px;margin:15px 0;border:2px dashed #00ffcc;display:block}
+.status-box{padding:15px;border-radius:10px;margin:15px 0;font-size:20px;font-weight:bold}
+.status-online{background:rgba(37,211,102,0.15);color:#25D366;border:2px solid #25D366}
+.status-offline{background:rgba(238,82,83,0.15);color:#ee5253;border:2px solid #ee5253}
+.log{margin-top:15px;text-align:left;background:#0a0815;padding:12px;border-radius:8px;font-size:12px;max-height:150px;overflow-y:auto;font-family:monospace;color:#888;border:1px solid #2a2540}
+.contador{font-size:14px;color:#00ffcc;margin-top:10px}
+.heartbeat{font-size:13px;color:#888;margin-top:8px}
+</style></head>
+<body><div class="card">
+<h1>🚀 Atrino Bot</h1>
+<div class="status-box ${statusConexao === 'conectado' ? 'status-online' : 'status-offline'}">${statusTxt}</div>
+<div class="heartbeat" id="hb">❤️ Último sinal: verificando...</div>
+${senhaRegistro ? `<p>Senha:</p><span class="senha">${senhaRegistro}</span><p>.registrar ${senhaRegistro}</p>` : '<p style="color:#ee5253">Nenhuma senha ativa.</p>'}
+<a href__="/gerar-senha" class="btn">🔄 GERAR SENHA</a>
+<hr style="margin:20px 0;border-color:#3d3475">
+<h3>📡 Keep-Alive (Ping)</h3>
+<button id="btnPing" class="btn-ping" onclick="togglePing()">▶️ INICIAR PING</button>
+<div class="contador" id="contador">Pings enviados: 0</div>
+<div class="log" id="log">[log] Aguardando início...</div>
+</div>
+<script>
+let pingInterval = null;
+let pingCount = 0;
+const btn = document.getElementById('btnPing');
+const log = document.getElementById('log');
+const contador = document.getElementById('contador');
+
+function addLog(msg) {
+    const t = new Date().toLocaleTimeString('pt-BR');
+    log.innerHTML = '[' + t + '] ' + msg + '<br>' + log.innerHTML;
+    if (log.innerHTML.length > 2000) log.innerHTML = log.innerHTML.substring(0, 2000);
+}
+
+async function enviarPing() {
+    try {
+        const resp = await fetch('/ping', { cache: 'no-store' });
+        const data = await resp.json();
+        pingCount++;
+        contador.innerHTML = 'Pings enviados: ' + pingCount + ' | Status: ' + (data.status || '?');
+        addLog('✅ Ping #' + pingCount + ' OK — ' + data.status);
+    } catch (e) {
+        addLog('❌ Falhou: ' + e.message);
+    }
+}
+
+function togglePing() {
+    if (pingInterval) {
+        clearInterval(pingInterval);
+        pingInterval = null;
+        btn.className = 'btn-ping parado';
+        btn.innerHTML = '▶️ INICIAR PING';
+        addLog('⏹️ Ping parado');
+    } else {
+        enviarPing();
+        pingInterval = setInterval(enviarPing, 20000);
+        btn.className = 'btn-ping ativo';
+        btn.innerHTML = '⏸️ PARAR PING';
+        addLog('🟢 Ping iniciado (a cada 20s)');
+    }
+}
+
+// checa status no servidor a cada 10s
+setInterval(async () => {
+    try {
+        const r = await fetch('/status', { cache: 'no-store' });
+        const d = await r.json();
+        const hb = document.getElementById('hb');
+        const ago = Math.round((Date.now() - d.ultimoPing) / 1000);
+        hb.innerHTML = '❤️ Último sinal: ' + ago + 's atrás';
+    } catch {}
+}, 10000);
+</script>
+</body></html>`);
         return;
     }
+
+    // --- página com QR ---
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(`<html><head><title>Atrino Bot - QR</title><meta http-equiv="refresh" content="5">
-    <style>body{font-family:Arial;text-align:center;margin-top:50px;background:#111;color:#fff}</style></head>
-    <body><h1 style="color:#25D366">Escaneie o QR Code</h1>
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrAtual)}" style="border:10px solid white;border-radius:10px"/>
-    </body></html>`);
+    res.end(`<!DOCTYPE html>
+<html><head><title>Atrino Bot - QR</title>
+<meta http-equiv="refresh" content="5">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>body{font-family:Arial;text-align:center;margin-top:50px;background:#0f0c1b;color:#fff;padding:20px}
+h1{color:#25D366}
+.qr{border:10px solid white;border-radius:10px;max-width:90vw;width:300px}
+.status-box{padding:12px;border-radius:10px;margin:15px auto;max-width:300px;font-weight:bold;background:rgba(255,152,0,0.15);color:#ff9800;border:2px solid #ff9800}
+</style></head>
+<body><h1>📱 Escaneie o QR Code</h1>
+<div class="status-box">⏳ Aguardando conexão...</div>
+<img class="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrAtual)}"/>
+<p style="color:#888;margin-top:20px;font-size:14px">Atualiza em 5s automaticamente</p>
+</body></html>`);
 }).listen(PORT, '0.0.0.0', () => {
     console.log(`🛰️ Servidor ativo na porta ${PORT}`);
-    setInterval(() => { http.get(`http://localhost:${PORT}`).on('error', () => {}); }, 60000);
+    // ping interno (mantém processo ativo)
+    setInterval(() => { http.get(`http://localhost:${PORT}/ping`).on('error', () => {}); }, 30000);
 });
 
 async function baixarMidiaDoMensagem(sock, message) {
@@ -281,9 +392,6 @@ async function baixarMidiaDoMensagem(sock, message) {
     return null;
 }
 
-// ============================================================
-// HORÁRIOS DISPONÍVEIS PARA LOGIN DE TRIAGEM
-// ============================================================
 function gerarHorariosDisponiveis() {
     const agora = new Date();
     const slots = [];
@@ -347,19 +455,36 @@ async function startAtrinoBot() {
         if (Object.keys(alertasTikTok).length > 0) await checarNovosTikToks(sock);
     });
 
+    // ============================================================
+    // CONEXÃO — agora seta statusConexao (página mostra a verdade)
+    // ============================================================
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
             qrAtual = qr;
+            statusConexao = 'aguardando_qr';
             console.log('\n🔗 QR: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(qr));
             qrcode.generate(qr, { small: false });
         }
-        if (connection === 'open') { qrAtual = null; console.log('\n✅ ATRINO BOT ONLINE!\n'); }
+        if (connection === 'open') {
+            qrAtual = null;
+            statusConexao = 'conectado';
+            console.log('\n✅ ATRINO BOT ONLINE!\n');
+        }
         if (connection === 'close') {
             qrAtual = null;
+            statusConexao = 'desconectado';
             const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-            if (reason !== DisconnectReason.loggedOut) { console.log('🔄 Reconectando...'); startAtrinoBot(); }
-            else console.log('❌ Sessão encerrada permanentemente.');
+            console.log('🔄 Conexão fechada (código:', reason, ') - Status: DESCONECTADO');
+            if (reason !== DisconnectReason.loggedOut) {
+                console.log('🔄 Reiniciando em 5s...');
+                setTimeout(() => startAtrinoBot(), 5000);
+            } else {
+                console.log('❌ Sessão encerrada permanentemente.');
+            }
+        }
+        if (connection === 'connecting') {
+            statusConexao = statusConexao === 'conectado' ? 'desconectado' : statusConexao;
         }
     });
 
@@ -375,7 +500,6 @@ async function startAtrinoBot() {
         const sender  = m.key.participant || m.key.remoteJid;
         const body    = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || '');
 
-        // --- recebe mídia no PV durante triagem ---
         if (!isGroup && !m.message.conversation && !m.message.extendedTextMessage?.text) {
             const sessao = sessoesTriagem[sender];
             if (sessao && grupoTriagemAtivo) {
@@ -384,7 +508,6 @@ async function startAtrinoBot() {
             }
         }
 
-        // --- captura número informado em texto ---
         if (!isGroup) {
             const sessao = sessoesTriagem[sender];
             const txt = m.message.conversation || m.message.extendedTextMessage?.text || '';
@@ -394,14 +517,12 @@ async function startAtrinoBot() {
             }
         }
 
-        // --- reset por inatividade ---
         const agoraMs = Date.now();
         if (ultimaInteracao[sender] && (agoraMs - ultimaInteracao[sender]) > 5 * 24 * 60 * 60 * 1000) {
             saldosUFSC[sender] = 0;
         }
         ultimaInteracao[sender] = agoraMs;
 
-        // --- contagem de atividade ---
         if (contagemAtiva[jid]) {
             if (!estatisticas[jid]) estatisticas[jid] = {};
             if (!estatisticas[jid][sender]) estatisticas[jid][sender] = { mensagens: 0, fotos: 0, videos: 0, figurinhas: 0, total: 0 };
@@ -413,9 +534,6 @@ async function startAtrinoBot() {
             else if (m.message.stickerMessage) ua.figurinhas++;
         }
 
-        // ============================================================
-        // NOVO: RASTREAMENTO DE MENSAGENS PARA .apagar
-        // ============================================================
         if (isGroup) {
             if (!mensagensRastreadas[jid]) mensagensRastreadas[jid] = {};
             if (!mensagensRastreadas[jid][sender]) mensagensRastreadas[jid][sender] = [];
@@ -425,10 +543,6 @@ async function startAtrinoBot() {
             }
         }
 
-        // ============================================================
-        // NOVO: SISTEMA ANTI-FLOOD (.flood)
-        // Detecta foto/figurinha repetida +5x e remove o usuário
-        // ============================================================
         if (isGroup && floodAtivo[jid]) {
             let mediaHash = null;
             let tipoMidia = '';
@@ -441,7 +555,6 @@ async function startAtrinoBot() {
             }
 
             if (mediaHash) {
-                // Verifica se é admin (admins não sofrem flood)
                 let senderEhAdminFlood = (sender === DONO_SUPREMO || sender === DONO_ADMIN);
                 if (!senderEhAdminFlood) {
                     try {
@@ -455,7 +568,6 @@ async function startAtrinoBot() {
                     if (!floodContagem[keyFlood]) {
                         floodContagem[keyFlood] = { count: 0, firstTime: agoraMs };
                     }
-                    // reseta se passou da janela
                     if (agoraMs - floodContagem[keyFlood].firstTime > FLOOD_JANELA) {
                         floodContagem[keyFlood] = { count: 0, firstTime: agoraMs };
                     }
@@ -478,9 +590,6 @@ async function startAtrinoBot() {
             }
         }
 
-        // ============================================================
-        // COMANDOS DO PV (triagem)
-        // ============================================================
         if (!isGroup && body.startsWith('.')) {
             const pvArgs    = body.slice(1).trim().split(/ +/);
             const pvCommand = pvArgs.shift().toLowerCase();
@@ -544,7 +653,6 @@ async function startAtrinoBot() {
 
         if (!isGroup) return;
 
-        // --- anagrama ---
         if (anagramaGame.ativo && anagramaGame.jid === jid && body.toLowerCase() === anagramaGame.palavra) {
             saldosUFSC[sender] = (saldosUFSC[sender] || 0) + 1;
             await sock.sendMessage(jid, { text: `🎉 *ACERTOU!* @${sender.split('@')[0]} ganhou 1 UFSC! 💰 Saldo: ${saldosUFSC[sender]}`, mentions: [sender] });
@@ -553,7 +661,6 @@ async function startAtrinoBot() {
             return sock.sendMessage(jid, { text: `🧩 *${anagramaGame.embaralhada}*` });
         }
 
-        // --- mutados ---
         if (mutados.includes(sender)) {
             try {
                 await sock.sendMessage(jid, { delete: m.key });
@@ -582,7 +689,6 @@ async function startAtrinoBot() {
             await sock.sendMessage(jid, { text: `📢 *Chamada Geral!*`, mentions: meta.participants.map(p => p.id) });
         }
 
-        // --- CAPTURA ESCOLHA DE HORÁRIO ---
         if (adminsTriagem[sender]?._aguardandoEscolha && /^[1-6]$/.test(body.trim())) {
             const dadosAdm = adminsTriagem[sender];
             const idx = parseInt(body.trim()) - 1;
@@ -638,9 +744,6 @@ async function startAtrinoBot() {
 
         switch (command) {
 
-            // --------------------------------------------------------
-            // MENU (atualizado com novos comandos)
-            // --------------------------------------------------------
             case 'menu':
                 if (!isSenderAdmin) return sock.sendMessage(jid, { text: '❌ Apenas administradores.' }, { quoted: m });
                 await sock.sendMessage(jid, { text: `╭─── [ ATRINO BOT ] ───╮
@@ -688,14 +791,10 @@ async function startAtrinoBot() {
 ╰───────────────────╯` + logComando, mentions: [sender] }, { quoted: m });
                 break;
 
-            // ============================================================
-            // NOVO: .flood — Anti-flood (foto/figurinha repetida +5x = remoção)
-            // ============================================================
             case 'flood':
                 if (!isSenderAdmin) return;
                 floodAtivo[jid] = !floodAtivo[jid];
                 if (floodAtivo[jid]) {
-                    // limpa contagem antiga ao ativar
                     Object.keys(floodContagem).forEach(k => {
                         if (k.startsWith(jid + '|')) delete floodContagem[k];
                     });
@@ -705,10 +804,6 @@ async function startAtrinoBot() {
                 }
                 break;
 
-            // ============================================================
-            // NOVO: .pickall — Remove todos do grupo (senha 1717)
-            // Uso: .pickall (pede confirmação) → .pickall 1717 (executa)
-            // ============================================================
             case 'pickall': {
                 if (!isSenderAdmin) return;
                 const senhaPick = args[0];
@@ -726,12 +821,10 @@ async function startAtrinoBot() {
                     return sock.sendMessage(jid, { text: '❌ Senha incorreta! Operação cancelada.' }, { quoted: m });
                 }
 
-                // valida se foi pedido recentemente
                 if (!pickallPendente[jid]) {
                     return sock.sendMessage(jid, { text: '⚠️ Você precisa solicitar primeiro com *.pickall* (sem senha).' }, { quoted: m });
                 }
 
-                // expira em 60s
                 if (Date.now() - pickallPendente[jid].timestamp > 60 * 1000) {
                     delete pickallPendente[jid];
                     return sock.sendMessage(jid, { text: '⏰ Tempo de confirmação expirado. Solicite novamente com *.pickall*.' }, { quoted: m });
@@ -756,7 +849,6 @@ async function startAtrinoBot() {
                         } catch {
                             falhas++;
                         }
-                        // delay de 1.5s para evitar bloqueio/limite do WhatsApp
                         await new Promise(r => setTimeout(r, 1500));
                     }
                     await sock.sendMessage(jid, { text: `✅ *PICKALL CONCLUÍDO!*\n\n➥ Removidos: ${removidos}\n➥ Falhas: ${falhas}` });
@@ -766,10 +858,6 @@ async function startAtrinoBot() {
                 break;
             }
 
-            // ============================================================
-            // NOVO: .apagar — Apaga todas as mensagens de um usuário (varredura)
-            // Uso: .apagar @user  OU  responder a uma mensagem do alvo com .apagar
-            // ============================================================
             case 'apagar': {
                 if (!isSenderAdmin) return;
                 const alvoApagar = getMention() || m.message.extendedTextMessage?.contextInfo?.participant;
@@ -777,7 +865,6 @@ async function startAtrinoBot() {
                     return sock.sendMessage(jid, { text: '❌ Mencione o usuário ou responda a uma mensagem dele!\n\nExemplo: *.apagar @usuario*' }, { quoted: m });
                 }
 
-                // admin não pode ser apagado
                 let alvoEhAdminApagar = false;
                 try {
                     const metaApagar = await sock.groupMetadata(jid);
@@ -802,7 +889,6 @@ async function startAtrinoBot() {
 
                 let apagadas = 0;
                 let falhasApagar = 0;
-                // copia e limpa imediatamente para evitar duplicação
                 const paraApagar = [...msgsAlvo];
                 mensagensRastreadas[jid][alvoApagar] = [];
 
@@ -813,7 +899,6 @@ async function startAtrinoBot() {
                     } catch {
                         falhasApagar++;
                     }
-                    // pequeno delay para não sobrecarregar
                     await new Promise(r => setTimeout(r, 150));
                 }
 
@@ -824,9 +909,6 @@ async function startAtrinoBot() {
                 break;
             }
 
-            // --------------------------------------------------------
-            // TRIAGEM — ATIVAR / DESATIVAR
-            // --------------------------------------------------------
             case 'ativar_triagem':
                 if (!isSenderAdmin) return;
                 grupoTriagemAtivo = jid;
@@ -847,9 +929,6 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: '🔒 Triagem desativada.' }, { quoted: m });
                 break;
 
-            // --------------------------------------------------------
-            // FILA
-            // --------------------------------------------------------
             case 'ativar_fila':
                 if (!isSenderAdmin) return;
                 filaAtiva = true;
@@ -874,9 +953,6 @@ async function startAtrinoBot() {
                 await sock.sendMessage(jid, { text: `✅ Link registrado:\n🔗 ${linkGrupoTriagem}` }, { quoted: m });
                 break;
 
-            // --------------------------------------------------------
-            // ADMINS DE TRIAGEM
-            // --------------------------------------------------------
             case 'registrar_adm': {
                 if (!isSenderAdmin) return;
                 const alvoCadastro = getMention();
@@ -1080,7 +1156,7 @@ async function startAtrinoBot() {
 
             case 'registrar':
                 if (gruposRegistrados.includes(jid)) return sock.sendMessage(jid, { text: '✅ Grupo já registrado!' }, { quoted: m });
-                if (!senhaRegistro || args[0] !== senhaRegistro) return sock.sendMessage(jid, { text: `⚠️ Senha inválida.\n🔗 https://servidor-jct9.onrender.com/` }, { quoted: m });
+                if (!senhaRegistro || args[0] !== senhaRegistro) return sock.sendMessage(jid, { text: `⚠️ Senha inválida.\n🔗 https://servidor-72g6.onrender.com/` }, { quoted: m });
                 await sock.sendMessage(jid, { text: '⏳ Registrando...' }, { quoted: m });
                 gruposRegistrados.push(jid);
                 await syncEstadoBotToGithub();
@@ -1090,7 +1166,7 @@ async function startAtrinoBot() {
 
             case 'desativa_bot':
                 if (!isSenderAdmin) return;
-                if (!senhaRegistro || args[0] !== senhaRegistro) return sock.sendMessage(jid, { text: `⚠️ Senha inválida.\n🔗 https://servidor-jct9.onrender.com/` }, { quoted: m });
+                if (!senhaRegistro || args[0] !== senhaRegistro) return sock.sendMessage(jid, { text: `⚠️ Senha inválida.\n🔗 https://servidor-72g6.onrender.com/` }, { quoted: m });
                 await sock.sendMessage(jid, { text: `╭─── [ ⚠️ *BOT DESATIVADO* ] ───╮\n│ O bot sairá em 5 minutos.\n╰─────────────────────╯` });
                 gruposRegistrados = gruposRegistrados.filter(id => id !== jid);
                 if (grupoTriagemAtivo === jid) grupoTriagemAtivo = null;
