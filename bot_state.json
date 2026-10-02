@@ -37,7 +37,7 @@
       "aberto": false,
       "executado": false,
       "ultimoFechamento": "02/10",
-      "ultimaAbertura": null
+      "ultimaAbertura": "02/10"
     },
     {
       "grupo": "120363410006944850@g.us",
@@ -93,5 +93,5 @@
   "sorteiosAtivosPorGrupo": {
     "120363410006944850@g.us": false
   },
-  "atualizadoEm": "2026-10-02T03:00:00.059Z"
+  "atualizadoEm": "2026-10-02T09:00:00.065Z"
 }
