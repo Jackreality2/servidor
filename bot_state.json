@@ -12,5 +12,20 @@
   "triagensAtivasPorCodigo": {
     "10": true
   },
-  "atualizadoEm": "2026-10-02T00:15:20.617Z"
+  "agendamentos": [
+    {
+      "grupo": "120363410006944850@g.us",
+      "horaFecha": "21:32",
+      "horaAbre": "21:33",
+      "dataProg": null,
+      "recorrente": true,
+      "criadoEm": 1790901070017,
+      "fechado": false,
+      "aberto": false,
+      "executado": false,
+      "ultimoFechamento": null,
+      "ultimaAbertura": null
+    }
+  ],
+  "atualizadoEm": "2026-10-02T00:31:10.018Z"
 }
