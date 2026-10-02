@@ -38,6 +38,19 @@
       "executado": false,
       "ultimoFechamento": null,
       "ultimaAbertura": null
+    },
+    {
+      "grupo": "120363410006944850@g.us",
+      "horaFecha": "23:30",
+      "horaAbre": "06:00",
+      "dataProg": null,
+      "recorrente": true,
+      "criadoEm": 1790908012220,
+      "fechado": false,
+      "aberto": false,
+      "executado": false,
+      "ultimoFechamento": null,
+      "ultimaAbertura": null
     }
   ],
   "pontosSorteio": {
@@ -80,5 +93,5 @@
   "sorteiosAtivosPorGrupo": {
     "120363410006944850@g.us": true
   },
-  "atualizadoEm": "2026-10-02T02:24:01.656Z"
+  "atualizadoEm": "2026-10-02T02:26:52.220Z"
 }
