@@ -6,5 +6,11 @@
     "120363410998914953@g.us"
   ],
   "grupoTriagemAtivo": "120363410998914953@g.us",
-  "atualizadoEm": "2026-10-01T23:40:49.991Z"
+  "gruposTriagemPorCodigo": {
+    "10": "120363410998914953@g.us"
+  },
+  "triagensAtivasPorCodigo": {
+    "10": true
+  },
+  "atualizadoEm": "2026-10-02T00:15:20.617Z"
 }
