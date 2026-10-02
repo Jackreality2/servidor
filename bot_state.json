@@ -25,7 +25,20 @@
       "executado": false,
       "ultimoFechamento": "01/10",
       "ultimaAbertura": "01/10"
+    },
+    {
+      "grupo": "120363410006944850@g.us",
+      "horaFecha": "00:00",
+      "horaAbre": "06:00",
+      "dataProg": null,
+      "recorrente": true,
+      "criadoEm": 1790901195405,
+      "fechado": false,
+      "aberto": false,
+      "executado": false,
+      "ultimoFechamento": null,
+      "ultimaAbertura": null
     }
   ],
-  "atualizadoEm": "2026-10-02T00:33:00.126Z"
+  "atualizadoEm": "2026-10-02T00:33:15.406Z"
 }
