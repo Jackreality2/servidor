@@ -10,7 +10,7 @@
     "10": "120363410998914953@g.us"
   },
   "triagensAtivasPorCodigo": {
-    "10": true
+    "10": false
   },
   "agendamentos": [
     {
@@ -132,5 +132,5 @@
   "sorteiosAtivosPorGrupo": {
     "120363410006944850@g.us": true
   },
-  "atualizadoEm": "2026-10-03T19:30:02.154Z"
+  "atualizadoEm": "2026-10-03T19:30:22.186Z"
 }
