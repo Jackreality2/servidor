@@ -116,5 +116,15 @@
   "gruposOcorrenciaAtivos": {
     "120363410006944850@g.us": true
   },
-  "atualizadoEm": "2026-10-04T21:54:03.762Z"
+  "alugueisPendentes": {
+    "98c51527-0443-49a0-90f7-654f0b34f81e": {
+      "comprador": "61813504876588@lid",
+      "grupoJid": "120363428799561646@g.us",
+      "valor": 10,
+      "status": "pending",
+      "criadoEm": 1791158036546
+    }
+  },
+  "alugueisAtivosPorGrupo": {},
+  "atualizadoEm": "2026-10-04T23:53:56.764Z"
 }
