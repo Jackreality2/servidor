@@ -122,9 +122,10 @@
       "grupoJid": "120363428799561646@g.us",
       "valor": 10,
       "status": "pending",
-      "criadoEm": 1791158036546
+      "criadoEm": 1791158036546,
+      "paymentId": "182415834534"
     }
   },
   "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-10-04T23:53:56.764Z"
+  "atualizadoEm": "2026-10-04T23:53:58.685Z"
 }
