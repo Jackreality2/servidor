@@ -50,7 +50,7 @@
       "aberto": false,
       "executado": false,
       "ultimoFechamento": "03/10",
-      "ultimaAbertura": "03/10"
+      "ultimaAbertura": "04/10"
     }
   ],
   "pontosSorteio": {
@@ -123,7 +123,7 @@
       "63630611611898@lid": 4,
       "212601116061719@lid": 2,
       "256375909310551@lid": 3,
-      "271906494251120@lid": 3
+      "271906494251120@lid": 4
     },
     "120363411452432151@g.us": {
       "140372919488758@lid": 1,
@@ -137,5 +137,5 @@
   "sorteiosAtivosPorGrupo": {
     "120363410006944850@g.us": true
   },
-  "atualizadoEm": "2026-10-04T09:00:00.944Z"
+  "atualizadoEm": "2026-10-04T09:00:03.225Z"
 }
