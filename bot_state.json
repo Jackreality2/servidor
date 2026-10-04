@@ -12,47 +12,7 @@
   "triagensAtivasPorCodigo": {
     "10": true
   },
-  "agendamentos": [
-    {
-      "grupo": "120363410006944850@g.us",
-      "horaFecha": "21:32",
-      "horaAbre": "21:33",
-      "dataProg": null,
-      "recorrente": true,
-      "criadoEm": 1790901070017,
-      "fechado": false,
-      "aberto": false,
-      "executado": false,
-      "ultimoFechamento": "03/10",
-      "ultimaAbertura": "03/10"
-    },
-    {
-      "grupo": "120363410006944850@g.us",
-      "horaFecha": "00:00",
-      "horaAbre": "06:00",
-      "dataProg": null,
-      "recorrente": true,
-      "criadoEm": 1790901195405,
-      "fechado": false,
-      "aberto": false,
-      "executado": false,
-      "ultimoFechamento": "04/10",
-      "ultimaAbertura": "04/10"
-    },
-    {
-      "grupo": "120363410006944850@g.us",
-      "horaFecha": "23:30",
-      "horaAbre": "06:00",
-      "dataProg": null,
-      "recorrente": true,
-      "criadoEm": 1790908012220,
-      "fechado": false,
-      "aberto": false,
-      "executado": false,
-      "ultimoFechamento": "03/10",
-      "ultimaAbertura": "04/10"
-    }
-  ],
+  "agendamentos": [],
   "pontosSorteio": {
     "120363425836341778@g.us": {
       "61813504876588@lid": 1,
@@ -143,5 +103,5 @@
   "gruposOcorrenciaAtivos": {
     "120363410006944850@g.us": true
   },
-  "atualizadoEm": "2026-10-04T21:07:42.520Z"
+  "atualizadoEm": "2026-10-04T21:14:51.246Z"
 }
