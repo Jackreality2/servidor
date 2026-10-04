@@ -12,7 +12,21 @@
   "triagensAtivasPorCodigo": {
     "10": true
   },
-  "agendamentos": [],
+  "agendamentos": [
+    {
+      "grupo": "120363410006944850@g.us",
+      "horaFecha": "00:00",
+      "horaAbre": "06:00",
+      "dataProg": null,
+      "recorrente": true,
+      "criadoEm": 1791148567614,
+      "fechado": false,
+      "aberto": false,
+      "executado": false,
+      "ultimoFechamento": null,
+      "ultimaAbertura": null
+    }
+  ],
   "pontosSorteio": {
     "120363425836341778@g.us": {
       "61813504876588@lid": 1,
@@ -103,5 +117,5 @@
   "gruposOcorrenciaAtivos": {
     "120363410006944850@g.us": true
   },
-  "atualizadoEm": "2026-10-04T21:14:51.246Z"
+  "atualizadoEm": "2026-10-04T21:16:07.840Z"
 }
