@@ -3,7 +3,8 @@
     "120363425836341778@g.us",
     "120363410006944850@g.us",
     "120363411452432151@g.us",
-    "120363410998914953@g.us"
+    "120363410998914953@g.us",
+    "120363428799561646@g.us"
   ],
   "grupoTriagemAtivo": "120363410998914953@g.us",
   "gruposTriagemPorCodigo": {
@@ -118,14 +119,17 @@
   },
   "alugueisPendentes": {
     "98c51527-0443-49a0-90f7-654f0b34f81e": {
-      "comprador": "61813504876588@lid",
       "grupoJid": "120363428799561646@g.us",
       "valor": 10,
-      "status": "pending",
+      "status": "approved",
       "criadoEm": 1791158036546,
-      "paymentId": "182415834534"
+      "paymentId": "182415834534",
+      "pagoEm": 1791158160150,
+      "expiraEm": 1793750160150
     }
   },
-  "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-10-04T23:53:58.685Z"
+  "alugueisAtivosPorGrupo": {
+    "120363428799561646@g.us": 1793750160150
+  },
+  "atualizadoEm": "2026-10-04T23:56:00.394Z"
 }
