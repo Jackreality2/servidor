@@ -133,7 +133,10 @@
     }
   },
   "sorteiosAtivosPorGrupo": {
-    "120363410006944850@g.us": false
+    "120363410006944850@g.us": true
   },
-  "atualizadoEm": "2026-10-04T14:55:14.230Z"
+  "sorteiosContagemPorGrupo": {},
+  "textosAberturaPorGrupo": {},
+  "textosFechamentoPorGrupo": {},
+  "atualizadoEm": "2026-10-04T20:01:44.905Z"
 }
