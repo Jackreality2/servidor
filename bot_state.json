@@ -74,7 +74,7 @@
       "61813504876588@lid": 6,
       "54048405344377@lid": 9,
       "87080478740712@lid": 6,
-      "272030746284044@lid": 6,
+      "272030746284044@lid": 7,
       "232641618047193@lid": 7,
       "70991967461439@lid": 6,
       "100137414217785@lid": 8,
@@ -111,7 +111,11 @@
   "sorteiosAtivosPorGrupo": {
     "120363410006944850@g.us": true
   },
-  "sorteiosContagemPorGrupo": {},
+  "sorteiosContagemPorGrupo": {
+    "120363410006944850@g.us": {
+      "272030746284044@lid": 1
+    }
+  },
   "textosAberturaPorGrupo": {},
   "textosFechamentoPorGrupo": {},
   "grupoLocalOcorrencias": "120363409413767461@g.us",
@@ -132,5 +136,5 @@
   "alugueisAtivosPorGrupo": {
     "120363428799561646@g.us": 1793750160150
   },
-  "atualizadoEm": "2026-10-05T01:25:36.791Z"
+  "atualizadoEm": "2026-10-05T01:27:03.691Z"
 }
