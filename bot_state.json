@@ -12,7 +12,7 @@
     "10": "120363410998914953@g.us"
   },
   "triagensAtivasPorCodigo": {
-    "10": false
+    "10": true
   },
   "agendamentos": [
     {
@@ -183,5 +183,5 @@
   "alugueisAtivosPorGrupo": {
     "120363428799561646@g.us": 1793750160150
   },
-  "atualizadoEm": "2026-10-06T17:21:22.481Z"
+  "atualizadoEm": "2026-10-06T17:21:53.921Z"
 }
