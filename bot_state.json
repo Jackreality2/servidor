@@ -18,16 +18,16 @@
   "agendamentos": [
     {
       "grupo": "120363410006944850@g.us",
-      "horaFecha": "00:00",
-      "horaAbre": "06:00",
+      "horaFecha": "23:00",
+      "horaAbre": "07:00",
       "dataProg": null,
       "recorrente": true,
-      "criadoEm": 1791148567614,
+      "criadoEm": 1791510815570,
       "fechado": false,
       "aberto": false,
       "executado": false,
-      "ultimoFechamento": "08/10",
-      "ultimaAbertura": "08/10"
+      "ultimoFechamento": null,
+      "ultimaAbertura": null
     }
   ],
   "pontosSorteio": {
@@ -194,5 +194,5 @@
   "alugueisAtivosPorGrupo": {
     "120363428799561646@g.us": 1793750160150
   },
-  "atualizadoEm": "2026-10-09T00:28:48.892Z"
+  "atualizadoEm": "2026-10-09T01:53:35.808Z"
 }
