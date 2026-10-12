@@ -202,9 +202,7 @@
   "textosAberturaPorGrupo": {},
   "textosFechamentoPorGrupo": {},
   "grupoLocalOcorrencias": "120363409413767461@g.us",
-  "gruposOcorrenciaAtivos": {
-    "120363410006944850@g.us": true
-  },
+  "gruposOcorrenciaAtivos": {},
   "alugueisPendentes": {
     "98c51527-0443-49a0-90f7-654f0b34f81e": {
       "grupoJid": "120363428799561646@g.us",
@@ -219,5 +217,5 @@
   "alugueisAtivosPorGrupo": {
     "120363428799561646@g.us": 1793750160150
   },
-  "atualizadoEm": "2026-10-12T17:00:04.220Z"
+  "atualizadoEm": "2026-10-12T17:02:18.501Z"
 }
