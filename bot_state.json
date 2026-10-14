@@ -125,7 +125,7 @@
     }
   },
   "sorteiosAtivosPorGrupo": {
-    "120363410006944850@g.us": false,
+    "120363410006944850@g.us": true,
     "120363410047915095@g.us": false
   },
   "sorteiosContagemPorGrupo": {
@@ -219,5 +219,5 @@
   "alugueisAtivosPorGrupo": {
     "120363428799561646@g.us": 1793750160150
   },
-  "atualizadoEm": "2026-10-14T23:22:35.291Z"
+  "atualizadoEm": "2026-10-14T23:23:12.494Z"
 }
