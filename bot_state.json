@@ -30,6 +30,19 @@
       "executado": false,
       "ultimoFechamento": "21/10",
       "ultimaAbertura": "22/10"
+    },
+    {
+      "grupo": "120363412114406615@g.us",
+      "horaFecha": "00:00",
+      "horaAbre": "06:00",
+      "dataProg": null,
+      "recorrente": true,
+      "criadoEm": 1792725266437,
+      "fechado": false,
+      "aberto": false,
+      "executado": false,
+      "ultimoFechamento": null,
+      "ultimaAbertura": null
     }
   ],
   "pontosSorteio": {
@@ -242,5 +255,5 @@
   "alugueisAtivosPorGrupo": {
     "120363428799561646@g.us": 1793750160150
   },
-  "atualizadoEm": "2026-10-22T17:55:10.311Z"
+  "atualizadoEm": "2026-10-23T03:14:26.657Z"
 }
