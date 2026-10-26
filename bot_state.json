@@ -42,7 +42,7 @@
       "aberto": false,
       "executado": false,
       "ultimoFechamento": "26/10",
-      "ultimaAbertura": "25/10"
+      "ultimaAbertura": "26/10"
     }
   ],
   "pontosSorteio": {
@@ -255,5 +255,5 @@
   "alugueisAtivosPorGrupo": {
     "120363428799561646@g.us": 1793750160150
   },
-  "atualizadoEm": "2026-10-26T03:00:01.815Z"
+  "atualizadoEm": "2026-10-26T09:00:01.884Z"
 }
