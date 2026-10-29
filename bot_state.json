@@ -299,7 +299,8 @@
   "textosFechamentoPorGrupo": {},
   "grupoLocalOcorrencias": "120363425836341778@g.us",
   "gruposOcorrenciaAtivos": {
-    "120363410006944850@g.us": true
+    "120363410006944850@g.us": true,
+    "120363425836341778@g.us": true
   },
   "alugueisPendentes": {
     "98c51527-0443-49a0-90f7-654f0b34f81e": {
@@ -315,5 +316,5 @@
   "alugueisAtivosPorGrupo": {
     "120363428799561646@g.us": 1793750160150
   },
-  "atualizadoEm": "2026-10-29T11:09:15.123Z"
+  "atualizadoEm": "2026-10-29T11:13:28.409Z"
 }
