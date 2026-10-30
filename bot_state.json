@@ -41,7 +41,7 @@
       "fechado": false,
       "aberto": false,
       "executado": false,
-      "ultimoFechamento": "29/10",
+      "ultimoFechamento": "30/10",
       "ultimaAbertura": "29/10"
     }
   ],
@@ -345,5 +345,5 @@
   "alugueisAtivosPorGrupo": {
     "120363428799561646@g.us": 1793750160150
   },
-  "atualizadoEm": "2026-10-30T00:57:04.905Z"
+  "atualizadoEm": "2026-10-30T03:00:02.097Z"
 }
