@@ -40,7 +40,7 @@
       "fechado": false,
       "aberto": false,
       "executado": false,
-      "ultimoFechamento": "03/11",
+      "ultimoFechamento": "04/11",
       "ultimaAbertura": "03/11"
     }
   ],
@@ -339,5 +339,5 @@
     }
   },
   "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-11-03T23:56:01.694Z"
+  "atualizadoEm": "2026-11-04T03:00:01.823Z"
 }
