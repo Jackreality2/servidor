@@ -98,7 +98,7 @@
       "grupoJid": "120363412114406615@g.us",
       "mensagem": "ATENÇÃO TODOS DEVERAM REFAZER SUAS TRIAGENS , SEREMOS MAIS RIGIDOS AGORA",
       "enviarEm": "2026-11-06T21:29:00.000Z",
-      "status": "enviando",
+      "status": "enviado",
       "criadoEm": 1794000467872
     }
   ],
@@ -408,5 +408,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-06T21:29:00.246Z"
+  "atualizadoEm": "2026-11-06T21:29:01.931Z"
 }
