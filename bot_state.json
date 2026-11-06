@@ -41,7 +41,7 @@
       "aberto": false,
       "executado": false,
       "ultimoFechamento": "06/11",
-      "ultimaAbertura": "05/11"
+      "ultimaAbertura": "06/11"
     }
   ],
   "eventosProgramados": [
@@ -352,7 +352,7 @@
       "ultimoVideoId": null,
       "ultimoTitulo": "",
       "inicializado": false,
-      "ultimoCheck": 1793946000520,
+      "ultimoCheck": 1793955600426,
       "ultimoErro": "SIGI_STATE não encontrado",
       "criadoEm": 1793945685943
     }
@@ -369,5 +369,5 @@
     }
   },
   "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-11-06T06:24:24.575Z"
+  "atualizadoEm": "2026-11-06T09:00:00.563Z"
 }
