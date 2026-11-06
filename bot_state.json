@@ -50,7 +50,7 @@
       "grupoJid": "120363412114406615@g.us",
       "mensagem": "│  E aí, pessoal, tá sabendo da novidade?\n│\n│  🤖 O bot está atualizado com uma\n│  *LOJINHA DE PODERES* exclusiva!\n│\n│  💰 Os pontos são ganhos nos *sorteios*.\n│  Vocês compram os poderes *diretamente*\n│  no grupo usando os comandos abaixo:\n│\n╰────────────────────────╯\n\n╭─── [ 🛒 *LOJA DE PODERES* ] ───╮\n│\n│  🔇 *Silêncio* — 1 ponto\n│  └ Silencia um membro por 1 minuto.\n│     Use: *.mutar @membro*\n│\n│  🥷 *Roubo de ponto* — 2 pontos\n│  └ Tenta roubar 1 ponto (50% de chance).\n│     Use: *.roubar @membro*\n│\n│  🎭 *Eliminação de faz de conta* — 5 pontos\n│  └ Cena fictícia de batalha (sem expulsar).\n│     Use: *.matar @membro*\n│\n│  🤸 *Rasteira de desenho* — 3 pontos\n│  └ Derruba em uma cena de comédia.\n│     Use: *.derrubar @membro*\n│\n│  😘 *Beijo virtual* — 1 ponto\n│  └ Manda um beijo virtual de brincadeira.\n│     Use: *.beijar @membro*\n│\n│  🤗 *Abraço* — 1 ponto\n│  └ Manda um abraço virtual pra alguém.\n│     Use: *.abracar @membro*\n│\n│  ✨ *Cura de brincadeira* — 2 pontos\n│  └ Recupera o",
       "enviarEm": "2026-11-06T06:00:00.000Z",
-      "status": "enviando",
+      "status": "enviado",
       "criadoEm": 1793944593006
     }
   ],
@@ -347,5 +347,5 @@
     }
   },
   "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-11-06T06:00:00.230Z"
+  "atualizadoEm": "2026-11-06T06:00:01.723Z"
 }
