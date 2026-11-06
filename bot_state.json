@@ -58,7 +58,7 @@
       "grupoJid": "120363410047915095@g.us",
       "mensagem": "E aí, pessoal! Passando para avisar\n│  que o *site oficial* da comunidade\n│  está *temporariamente suspenso*.\n│\n│  🛠️ *Motivo:* Limite de uso da\n│  hospedagem gratuita foi atingido.\n│\n│  ⏳ *Previsão de retorno:*\n│  Em até *24 horas* o site volta ao ar.\n│\n│  ✅ *O bot continua funcionando\n│  normalmente!* Os comandos, jogos,\n│  sorteios e a lojinha continuam ativos.",
       "enviarEm": "2026-11-06T06:20:00.000Z",
-      "status": "enviando",
+      "status": "enviado",
       "criadoEm": 1793945812934
     }
   ],
@@ -352,7 +352,7 @@
       "ultimoVideoId": null,
       "ultimoTitulo": "",
       "inicializado": false,
-      "ultimoCheck": 1793945700500,
+      "ultimoCheck": 1793946000520,
       "ultimoErro": "SIGI_STATE não encontrado",
       "criadoEm": 1793945685943
     }
@@ -369,5 +369,5 @@
     }
   },
   "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-11-06T06:20:00.242Z"
+  "atualizadoEm": "2026-11-06T06:20:02.256Z"
 }
