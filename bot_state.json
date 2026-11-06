@@ -76,6 +76,14 @@
       "enviarEm": "2026-11-06T16:58:00.000Z",
       "status": "enviado",
       "criadoEm": 1793984234728
+    },
+    {
+      "id": "0ea3763c-1463-4b60-a63b-df50b40a8c8f",
+      "grupoJid": "120363412114406615@g.us",
+      "mensagem": "LOJA ATUALIZADA DÊ O COMANDO .LOJA",
+      "enviarEm": "2026-11-06T17:01:00.000Z",
+      "status": "agendado",
+      "criadoEm": 1793984409289
     }
   ],
   "pontosSorteio": {
@@ -380,5 +388,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-06T16:58:51.874Z"
+  "atualizadoEm": "2026-11-06T17:00:09.503Z"
 }
