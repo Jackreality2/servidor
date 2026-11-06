@@ -371,5 +371,14 @@
     }
   },
   "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-11-06T16:58:01.657Z"
+  "poderesLoja": {
+    "mutar": 1,
+    "roubar": 0,
+    "matar": 5,
+    "derrubar": 3,
+    "beijar": 1,
+    "abracar": 1,
+    "curar": 2
+  },
+  "atualizadoEm": "2026-11-06T16:58:51.874Z"
 }
