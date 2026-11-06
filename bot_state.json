@@ -92,6 +92,14 @@
       "enviarEm": "2026-11-06T17:29:00.000Z",
       "status": "enviado",
       "criadoEm": 1793986084719
+    },
+    {
+      "id": "8696d23e-ae19-4933-806c-46afecba7e94",
+      "grupoJid": "120363412114406615@g.us",
+      "mensagem": "ATENÇÃO TODOS DEVERAM REFAZER SUAS TRIAGENS , SEREMOS MAIS RIGIDOS AGORA",
+      "enviarEm": "2026-11-06T21:29:00.000Z",
+      "status": "agendado",
+      "criadoEm": 1794000467872
     }
   ],
   "pontosSorteio": {
@@ -400,5 +408,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-06T18:43:05.103Z"
+  "atualizadoEm": "2026-11-06T21:27:48.036Z"
 }
