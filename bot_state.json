@@ -60,6 +60,14 @@
       "enviarEm": "2026-11-06T06:20:00.000Z",
       "status": "enviado",
       "criadoEm": 1793945812934
+    },
+    {
+      "id": "ad8f4c9f-a68f-489d-89a4-b70727b64cb8",
+      "grupoJid": "120363412114406615@g.us",
+      "mensagem": "oie seus cuzoes feios",
+      "enviarEm": "2026-11-06T16:55:00.000Z",
+      "status": "agendado",
+      "criadoEm": 1793984035767
     }
   ],
   "pontosSorteio": {
@@ -343,20 +351,6 @@
     "120363425836341778@g.us": true,
     "120363412114406615@g.us": true
   },
-  "alertasTikTok": {
-    "c969aeb0-7f31-4fc0-ab39-83400e79a64c": {
-      "id": "c969aeb0-7f31-4fc0-ab39-83400e79a64c",
-      "username": "ufcspasociety",
-      "grupoJid": "120363410047915095@g.us",
-      "perfilUrl": "https://www.tiktok.com/@ufcspasociety",
-      "ultimoVideoId": null,
-      "ultimoTitulo": "",
-      "inicializado": false,
-      "ultimoCheck": 1793955600426,
-      "ultimoErro": "SIGI_STATE não encontrado",
-      "criadoEm": 1793945685943
-    }
-  },
   "alugueisPendentes": {
     "98c51527-0443-49a0-90f7-654f0b34f81e": {
       "grupoJid": "120363428799561646@g.us",
@@ -369,5 +363,5 @@
     }
   },
   "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-11-06T09:00:00.563Z"
+  "atualizadoEm": "2026-11-06T16:53:55.923Z"
 }
