@@ -84,6 +84,14 @@
       "enviarEm": "2026-11-06T17:01:00.000Z",
       "status": "enviado",
       "criadoEm": 1793984409289
+    },
+    {
+      "id": "e7a35205-7853-48c8-bae8-ef194f3db180",
+      "grupoJid": "120363410047915095@g.us",
+      "mensagem": "luiz morreu :(",
+      "enviarEm": "2026-11-06T17:29:00.000Z",
+      "status": "agendado",
+      "criadoEm": 1793986084719
     }
   ],
   "pontosSorteio": {
@@ -393,5 +401,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-06T17:20:10.456Z"
+  "atualizadoEm": "2026-11-06T17:28:04.937Z"
 }
