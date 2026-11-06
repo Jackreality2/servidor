@@ -357,7 +357,14 @@
       "58828318097457@lid": 2
     }
   },
-  "comandosPersonalizados": [],
+  "comandosPersonalizados": [
+    {
+      "id": "fe2b3510-5355-4be6-bf24-c4725f0d3381",
+      "gatilho": "pontos",
+      "resposta": "// ========== .pontos ==========\n// Uso: .pontos  OU  .pontos @user\nasync function cmdPontos(message, args) {\n  const alvo = message.mentions.users.first() || message.author;\n  const user = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(alvo.id);\n  const pontos = user ? user.pontos : 0;\n\n  return message.reply(`💰 **${alvo.username}** possui **${pontos}** pontos.`);\n}",
+      "apenasAdmin": true
+    }
+  ],
   "textosAberturaPorGrupo": {},
   "textosFechamentoPorGrupo": {},
   "grupoLocalOcorrencias": "120363409413767461@g.us",
@@ -387,5 +394,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-06T17:11:49.272Z"
+  "atualizadoEm": "2026-11-06T17:11:55.208Z"
 }
