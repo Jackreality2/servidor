@@ -335,6 +335,20 @@
     "120363425836341778@g.us": true,
     "120363412114406615@g.us": true
   },
+  "alertasTikTok": {
+    "c969aeb0-7f31-4fc0-ab39-83400e79a64c": {
+      "id": "c969aeb0-7f31-4fc0-ab39-83400e79a64c",
+      "username": "ufcspasociety",
+      "grupoJid": "120363410047915095@g.us",
+      "perfilUrl": "https://www.tiktok.com/@ufcspasociety",
+      "ultimoVideoId": null,
+      "ultimoTitulo": "",
+      "inicializado": false,
+      "ultimoCheck": null,
+      "ultimoErro": null,
+      "criadoEm": 1793945685943
+    }
+  },
   "alugueisPendentes": {
     "98c51527-0443-49a0-90f7-654f0b34f81e": {
       "grupoJid": "120363428799561646@g.us",
@@ -347,5 +361,5 @@
     }
   },
   "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-11-06T06:00:01.723Z"
+  "atualizadoEm": "2026-11-06T06:14:46.122Z"
 }
