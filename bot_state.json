@@ -68,6 +68,14 @@
       "enviarEm": "2026-11-06T16:55:00.000Z",
       "status": "enviado",
       "criadoEm": 1793984035767
+    },
+    {
+      "id": "a06b52ce-361e-4b82-96d0-14a418f8d1e9",
+      "grupoJid": "120363425836341778@g.us",
+      "mensagem": "testando mensagem agendada",
+      "enviarEm": "2026-11-06T16:58:00.000Z",
+      "status": "agendado",
+      "criadoEm": 1793984234728
     }
   ],
   "pontosSorteio": {
@@ -363,5 +371,5 @@
     }
   },
   "alugueisAtivosPorGrupo": {},
-  "atualizadoEm": "2026-11-06T16:56:26.244Z"
+  "atualizadoEm": "2026-11-06T16:57:14.936Z"
 }
