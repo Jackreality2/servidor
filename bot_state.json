@@ -82,7 +82,7 @@
       "grupoJid": "120363412114406615@g.us",
       "mensagem": "LOJA ATUALIZADA DÊ O COMANDO .LOJA",
       "enviarEm": "2026-11-06T17:01:00.000Z",
-      "status": "agendado",
+      "status": "enviando",
       "criadoEm": 1793984409289
     }
   ],
@@ -388,5 +388,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-06T17:00:09.503Z"
+  "atualizadoEm": "2026-11-06T17:01:00.263Z"
 }
