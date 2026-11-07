@@ -107,7 +107,7 @@
       "grupoJid": "120363412114406615@g.us",
       "mensagem": "@name TRIAGENS ABERTAS PODEM FAZER",
       "enviarEm": "2026-11-07T16:44:00.000Z",
-      "status": "enviando",
+      "status": "falhou",
       "criadoEm": 1794069767820
     }
   ],
@@ -417,5 +417,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-07T16:44:00.172Z"
+  "atualizadoEm": "2026-11-07T16:44:01.054Z"
 }
