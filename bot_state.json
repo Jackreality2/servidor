@@ -101,6 +101,14 @@
       "enviarEm": "2026-11-06T21:29:00.000Z",
       "status": "enviado",
       "criadoEm": 1794000467872
+    },
+    {
+      "id": "5fe17b52-34e2-4754-8d59-e3727d8fe272",
+      "grupoJid": "120363412114406615@g.us",
+      "mensagem": "@name TRIAGENS ABERTAS PODEM FAZER",
+      "enviarEm": "2026-11-07T16:44:00.000Z",
+      "status": "agendado",
+      "criadoEm": 1794069767820
     }
   ],
   "pontosSorteio": {
@@ -409,5 +417,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-07T09:00:01.049Z"
+  "atualizadoEm": "2026-11-07T16:42:48.054Z"
 }
