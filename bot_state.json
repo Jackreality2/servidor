@@ -430,11 +430,6 @@
           "presencas": 0
         },
         {
-          "id": "14",
-          "nome": "Bonnie",
-          "presencas": 0
-        },
-        {
           "id": "15",
           "nome": "Santino",
           "presencas": 0
@@ -581,5 +576,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:18:16.436Z"
+  "atualizadoEm": "2026-11-08T17:29:15.724Z"
 }
