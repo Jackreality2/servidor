@@ -457,7 +457,7 @@
         {
           "id": "20",
           "nome": "Zara de Carvalho Oliveira",
-          "presencas": 2
+          "presencas": 3
         },
         {
           "id": "21",
@@ -581,5 +581,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:14:03.736Z"
+  "atualizadoEm": "2026-11-08T17:18:16.436Z"
 }
