@@ -41,7 +41,7 @@
       "fechado": false,
       "aberto": false,
       "executado": false,
-      "ultimoFechamento": "07/11",
+      "ultimoFechamento": "08/11",
       "ultimaAbertura": "07/11"
     }
   ],
@@ -252,11 +252,7 @@
       "61813504876588@lid": 45
     }
   },
-  "recompensasDiarias": {
-    "120363412114406615@g.us": {
-      "61813504876588@lid": 1793985574529
-    }
-  },
+  "recompensasDiarias": {},
   "sorteiosAtivosPorGrupo": {
     "120363410006944850@g.us": false,
     "120363410047915095@g.us": false,
@@ -416,5 +412,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-07T19:28:27.190Z"
+  "atualizadoEm": "2026-11-08T03:00:00.634Z"
 }
