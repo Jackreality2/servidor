@@ -430,11 +430,6 @@
           "presencas": 0
         },
         {
-          "id": "15",
-          "nome": "Santino",
-          "presencas": 0
-        },
-        {
           "id": "16",
           "nome": "Luis Otávio ADM",
           "presencas": 0
@@ -571,5 +566,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:29:30.824Z"
+  "atualizadoEm": "2026-11-08T17:29:45.709Z"
 }
