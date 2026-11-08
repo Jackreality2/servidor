@@ -415,6 +415,148 @@
     "120363410047915095@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]",
     "120363412114406615@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]"
   },
+  "avisosLogPresencasAtivos": {
+    "120363431015298692@g.us": {
+      "periodo": "2026-11-01|2026-11-14",
+      "membros": [
+        {
+          "id": "10",
+          "nome": "Débora (ADM)",
+          "presencas": 0
+        },
+        {
+          "id": "11",
+          "nome": "Maria (ADM)",
+          "presencas": 0
+        },
+        {
+          "id": "14",
+          "nome": "Bonnie",
+          "presencas": 0
+        },
+        {
+          "id": "15",
+          "nome": "Santino",
+          "presencas": 0
+        },
+        {
+          "id": "16",
+          "nome": "Luis Otávio ADM",
+          "presencas": 0
+        },
+        {
+          "id": "18",
+          "nome": "Gabriel ADM",
+          "presencas": 0
+        },
+        {
+          "id": "19",
+          "nome": "Dr.rosamaria",
+          "presencas": 0
+        },
+        {
+          "id": "2",
+          "nome": "Admin Inicial",
+          "presencas": 0
+        },
+        {
+          "id": "20",
+          "nome": "Zara de Carvalho Oliveira",
+          "presencas": 2
+        },
+        {
+          "id": "21",
+          "nome": "Alexandra",
+          "presencas": 4
+        },
+        {
+          "id": "23",
+          "nome": "João",
+          "presencas": 1
+        },
+        {
+          "id": "24",
+          "nome": "Pedro",
+          "presencas": 0
+        },
+        {
+          "id": "25",
+          "nome": "Nani",
+          "presencas": 0
+        },
+        {
+          "id": "26",
+          "nome": "Valdemir",
+          "presencas": 0
+        },
+        {
+          "id": "27",
+          "nome": "Eduardo",
+          "presencas": 1
+        },
+        {
+          "id": "29",
+          "nome": "Luiz Otávio",
+          "presencas": 4
+        },
+        {
+          "id": "31",
+          "nome": "Giovana Justus",
+          "presencas": 2
+        },
+        {
+          "id": "32",
+          "nome": "Paula urach",
+          "presencas": 4
+        },
+        {
+          "id": "33",
+          "nome": "Maria dos Prazeres",
+          "presencas": 4
+        },
+        {
+          "id": "34",
+          "nome": "Ufcspa",
+          "presencas": 0
+        },
+        {
+          "id": "35",
+          "nome": "Bia Cheiras",
+          "presencas": 0
+        },
+        {
+          "id": "4",
+          "nome": "Eventos",
+          "presencas": 3
+        },
+        {
+          "id": "5",
+          "nome": "Benedita (ADM)",
+          "presencas": 4
+        },
+        {
+          "id": "6",
+          "nome": "Valdirene",
+          "presencas": 0
+        },
+        {
+          "id": "7",
+          "nome": "Jussara",
+          "presencas": 0
+        },
+        {
+          "id": "8",
+          "nome": "Yago",
+          "presencas": 0
+        },
+        {
+          "id": "9",
+          "nome": "Lavínia de Souza",
+          "presencas": 0
+        }
+      ]
+    }
+  },
   "textosAberturaPorGrupo": {},
   "textosFechamentoPorGrupo": {},
   "grupoLocalOcorrencias": "120363409413767461@g.us",
@@ -444,5 +586,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T16:59:53.605Z"
+  "atualizadoEm": "2026-11-08T17:07:06.466Z"
 }
