@@ -392,16 +392,8 @@
     }
   },
   "comandosPersonalizados": [],
-  "noticiasSiteMonitoradas": {
-    "120363410047915095@g.us": [
-      "post:17",
-      "post:14",
-      "post:13",
-      "post:12",
-      "post:11",
-      "post:20"
-    ]
-  },
+  "noticiasSiteMonitoradas": {},
+  "locutoresSiteMonitorados": {},
   "textosAberturaPorGrupo": {},
   "textosFechamentoPorGrupo": {},
   "grupoLocalOcorrencias": "120363409413767461@g.us",
@@ -431,5 +423,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T16:23:04.502Z"
+  "atualizadoEm": "2026-11-08T16:29:15.915Z"
 }
