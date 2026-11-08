@@ -460,11 +460,6 @@
           "presencas": 0
         },
         {
-          "id": "26",
-          "nome": "Valdemir",
-          "presencas": 0
-        },
-        {
           "id": "29",
           "nome": "Luiz Otávio",
           "presencas": 3
@@ -541,5 +536,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:31:00.716Z"
+  "atualizadoEm": "2026-11-08T17:31:16.070Z"
 }
