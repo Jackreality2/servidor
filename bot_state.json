@@ -8,7 +8,8 @@
     "120363256594010356@g.us",
     "120363413576100650@g.us",
     "120363412114406615@g.us",
-    "120363415154747975@g.us"
+    "120363415154747975@g.us",
+    "120363410549823669@g.us"
   ],
   "grupoTriagemAtivo": "120363410998914953@g.us",
   "gruposTriagemPorCodigo": {
@@ -391,6 +392,7 @@
     }
   },
   "comandosPersonalizados": [],
+  "noticiasSiteMonitoradas": {},
   "textosAberturaPorGrupo": {},
   "textosFechamentoPorGrupo": {},
   "grupoLocalOcorrencias": "120363409413767461@g.us",
@@ -420,5 +422,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T13:53:01.561Z"
+  "atualizadoEm": "2026-11-08T16:08:09.123Z"
 }
