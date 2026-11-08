@@ -393,14 +393,6 @@
   },
   "comandosPersonalizados": [],
   "noticiasSiteMonitoradas": {
-    "120363410549823669@g.us": [
-      "post:17",
-      "post:14",
-      "post:13",
-      "post:12",
-      "post:11",
-      "post:9"
-    ],
     "120363410047915095@g.us": [
       "post:17",
       "post:14",
@@ -439,5 +431,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T16:17:03.504Z"
+  "atualizadoEm": "2026-11-08T16:17:13.143Z"
 }
