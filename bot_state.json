@@ -392,7 +392,12 @@
     }
   },
   "comandosPersonalizados": [],
-  "noticiasSiteMonitoradas": {},
+  "noticiasSiteMonitoradas": {
+    "120363410549823669@g.us": [
+      "O site voltou ao ar!",
+      "Novas atualizações disponíveis."
+    ]
+  },
   "textosAberturaPorGrupo": {},
   "textosFechamentoPorGrupo": {},
   "grupoLocalOcorrencias": "120363409413767461@g.us",
@@ -422,5 +427,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T16:08:09.123Z"
+  "atualizadoEm": "2026-11-08T16:08:23.562Z"
 }
