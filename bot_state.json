@@ -535,11 +535,6 @@
           "presencas": 0
         },
         {
-          "id": "8",
-          "nome": "Yago",
-          "presencas": 0
-        },
-        {
           "id": "9",
           "nome": "Lavínia de Souza",
           "presencas": 0
@@ -576,5 +571,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:29:15.724Z"
+  "atualizadoEm": "2026-11-08T17:29:30.824Z"
 }
