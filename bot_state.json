@@ -497,7 +497,7 @@
         {
           "id": "29",
           "nome": "Luiz Otávio",
-          "presencas": 4
+          "presencas": 3
         },
         {
           "id": "31",
@@ -586,5 +586,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:07:31.132Z"
+  "atualizadoEm": "2026-11-08T17:08:01.025Z"
 }
