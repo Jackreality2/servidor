@@ -445,11 +445,6 @@
           "presencas": 0
         },
         {
-          "id": "18",
-          "nome": "Gabriel ADM",
-          "presencas": 0
-        },
-        {
           "id": "19",
           "nome": "Dr.rosamaria",
           "presencas": 0
@@ -586,5 +581,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:08:01.025Z"
+  "atualizadoEm": "2026-11-08T17:13:15.749Z"
 }
