@@ -513,11 +513,6 @@
           "id": "6",
           "nome": "Valdirene",
           "presencas": 0
-        },
-        {
-          "id": "7",
-          "nome": "Jussara",
-          "presencas": 0
         }
       ]
     }
@@ -551,5 +546,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:30:30.701Z"
+  "atualizadoEm": "2026-11-08T17:30:45.700Z"
 }
