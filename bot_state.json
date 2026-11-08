@@ -455,11 +455,6 @@
           "presencas": 4
         },
         {
-          "id": "23",
-          "nome": "João",
-          "presencas": 1
-        },
-        {
           "id": "24",
           "nome": "Pedro",
           "presencas": 0
@@ -556,5 +551,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:30:15.749Z"
+  "atualizadoEm": "2026-11-08T17:30:30.701Z"
 }
