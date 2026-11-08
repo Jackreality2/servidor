@@ -475,11 +475,6 @@
           "presencas": 0
         },
         {
-          "id": "27",
-          "nome": "Eduardo",
-          "presencas": 1
-        },
-        {
           "id": "29",
           "nome": "Luiz Otávio",
           "presencas": 3
@@ -528,11 +523,6 @@
           "id": "7",
           "nome": "Jussara",
           "presencas": 0
-        },
-        {
-          "id": "9",
-          "nome": "Lavínia de Souza",
-          "presencas": 0
         }
       ]
     }
@@ -566,5 +556,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:29:45.709Z"
+  "atualizadoEm": "2026-11-08T17:30:15.749Z"
 }
