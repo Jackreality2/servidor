@@ -532,7 +532,7 @@
         {
           "id": "5",
           "nome": "Benedita (ADM)",
-          "presencas": 4
+          "presencas": 3
         },
         {
           "id": "6",
@@ -586,5 +586,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T17:07:06.466Z"
+  "atualizadoEm": "2026-11-08T17:07:31.132Z"
 }
