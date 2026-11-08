@@ -109,6 +109,14 @@
       "enviarEm": "2026-11-07T16:44:00.000Z",
       "status": "falhou",
       "criadoEm": 1794069767820
+    },
+    {
+      "id": "ebd53cce-5dc1-4b79-876c-c0a0b44dd3ce",
+      "grupoJid": "120363410047915095@g.us",
+      "mensagem": "@todos\n\n*📢 AVISO IMPORTANTE - UFCSPA SOCIETY*\n\n*ATENÇÃO!*\n\nEm breve nosso site será migrado para um novo domínio, com novos recursos e melhorias!\n\nAlém disso, nosso BOT será integrado diretamente ao site para facilitar ainda mais a experiência de todos.\n\nInformamos que todos os avanços do BOT e do SITE serão pagos, então não se preocupem com a hospedagem, será tudo por conta da *UFCSPA SOCIETY*.\n\nObrigado pela compreensão!\n\nBom dia!",
+      "enviarEm": "2026-11-08T13:53:00.000Z",
+      "status": "agendado",
+      "criadoEm": 1794145915958
     }
   ],
   "pontosSorteio": {
@@ -412,5 +420,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T09:00:00.703Z"
+  "atualizadoEm": "2026-11-08T13:51:56.119Z"
 }
