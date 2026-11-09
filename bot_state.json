@@ -460,7 +460,7 @@
         {
           "id": "21",
           "nome": "Alexandra",
-          "presencas": 0
+          "presencas": 1
         },
         {
           "id": "25",
@@ -539,5 +539,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-09T17:17:55.975Z"
+  "atualizadoEm": "2026-11-09T17:42:46.350Z"
 }
