@@ -415,7 +415,8 @@
       "post:17",
       "post:21",
       "post:22",
-      "post:23"
+      "post:23",
+      "post:24"
     ]
   },
   "locutoresSiteMonitorados": {
@@ -538,5 +539,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-09T17:48:03.689Z"
+  "atualizadoEm": "2026-11-09T17:48:05.545Z"
 }
