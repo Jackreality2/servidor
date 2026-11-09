@@ -425,7 +425,7 @@
   },
   "avisosLogPresencasAtivos": {
     "120363431015298692@g.us": {
-      "periodo": "2026-11-01|2026-11-14",
+      "periodo": "2026-11-08|2026-11-14",
       "membros": [
         {
           "id": "10",
@@ -455,12 +455,12 @@
         {
           "id": "20",
           "nome": "Zara de Carvalho Oliveira",
-          "presencas": 3
+          "presencas": 1
         },
         {
           "id": "21",
           "nome": "Alexandra",
-          "presencas": 4
+          "presencas": 0
         },
         {
           "id": "25",
@@ -470,22 +470,22 @@
         {
           "id": "29",
           "nome": "Luiz Otávio",
-          "presencas": 3
+          "presencas": 0
         },
         {
           "id": "31",
           "nome": "Giovana Justus",
-          "presencas": 2
+          "presencas": 0
         },
         {
           "id": "32",
           "nome": "Paula urach",
-          "presencas": 4
+          "presencas": 0
         },
         {
           "id": "33",
           "nome": "Maria dos Prazeres",
-          "presencas": 4
+          "presencas": 0
         },
         {
           "id": "34",
@@ -495,12 +495,12 @@
         {
           "id": "4",
           "nome": "Eventos",
-          "presencas": 3
+          "presencas": 0
         },
         {
           "id": "5",
           "nome": "Benedita (ADM)",
-          "presencas": 3
+          "presencas": 0
         },
         {
           "id": "6",
@@ -539,5 +539,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-08T19:59:04.023Z"
+  "atualizadoEm": "2026-11-09T00:00:00.753Z"
 }
