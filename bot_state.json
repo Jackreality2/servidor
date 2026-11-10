@@ -530,6 +530,11 @@
           "presencas": 0
         },
         {
+          "id": "36",
+          "nome": "Jack",
+          "presencas": 0
+        },
+        {
           "id": "4",
           "nome": "Eventos",
           "presencas": 0
@@ -576,5 +581,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-10T15:40:04.976Z"
+  "atualizadoEm": "2026-11-10T15:41:30.749Z"
 }
