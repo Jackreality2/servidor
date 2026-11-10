@@ -135,6 +135,14 @@
       "enviarEm": "2026-11-10T15:33:00.000Z",
       "status": "falhou",
       "criadoEm": 1794324749137
+    },
+    {
+      "id": "d8188d73-a605-4e0a-ad68-ef0cb9fd3ccd",
+      "grupoJid": "120363410047915095@g.us",
+      "mensagem": "*Porque á importância de entrar no grupo de logs?*\n\n•Porque lá vocês conseguem acompanhar as movimentações nos usuários de vocês que são cadastrados em nossa plataforma\n\n•Lá vocês conseguem saber a quantidade de pontos que acumularam ao decorrer da semana\n\n•Aparece também quando vocês recebem ou quando tem pontos removidos \n\n•Atenção toda movimentação e feita pelo painel do administrador, então apenas adms tem acesso\n\n\n_Não tem acesso? Chame nossos adms no privado e faça já seu cadastro , somente membros do grupo de meet_",
+      "enviarEm": "2026-11-10T15:35:00.000Z",
+      "status": "agendado",
+      "criadoEm": 1794324869048
     }
   ],
   "pontosSorteio": {
@@ -544,5 +552,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-10T15:33:02.950Z"
+  "atualizadoEm": "2026-11-10T15:34:29.230Z"
 }
