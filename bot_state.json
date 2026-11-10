@@ -535,9 +535,14 @@
           "presencas": 0
         },
         {
+          "id": "37",
+          "nome": "Bia Cheiras",
+          "presencas": 0
+        },
+        {
           "id": "4",
           "nome": "Eventos",
-          "presencas": 0
+          "presencas": 1
         },
         {
           "id": "5",
@@ -581,5 +586,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-10T16:01:04.201Z"
+  "atualizadoEm": "2026-11-10T16:07:15.971Z"
 }
