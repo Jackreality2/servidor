@@ -457,8 +457,8 @@
     ]
   },
   "locutoresSiteMonitorados": {
-    "120363412114406615@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]",
-    "120363410047915095@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]"
+    "120363412114406615@g.us": "[\"Ao Vivo com o Locutor\",\"Bia Cheiras\",\"Transmissão Manual\"]",
+    "120363410047915095@g.us": "[\"Ao Vivo com o Locutor\",\"Bia Cheiras\",\"Transmissão Manual\"]"
   },
   "avisosLogPresencasAtivos": {
     "120363431015298692@g.us": {
@@ -586,5 +586,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-10T16:07:15.971Z"
+  "atualizadoEm": "2026-11-10T16:08:03.257Z"
 }
