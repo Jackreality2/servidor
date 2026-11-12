@@ -439,12 +439,10 @@
   },
   "comandosPersonalizados": [],
   "noticiasSiteMonitoradas": {
-    "120363412114406615@g.us": [],
-    "120363410047915095@g.us": []
+    "120363412114406615@g.us": []
   },
   "locutoresSiteMonitorados": {
-    "120363412114406615@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]",
-    "120363410047915095@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]"
+    "120363412114406615@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]"
   },
   "avisosLogPresencasAtivos": {
     "120363431015298692@g.us": {
@@ -572,5 +570,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-12T09:00:01.782Z"
+  "atualizadoEm": "2026-11-12T14:39:06.498Z"
 }
