@@ -43,7 +43,7 @@
       "fechado": false,
       "aberto": false,
       "executado": false,
-      "ultimoFechamento": "12/11",
+      "ultimoFechamento": "13/11",
       "ultimaAbertura": "12/11"
     }
   ],
@@ -572,5 +572,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-12T14:40:03.664Z"
+  "atualizadoEm": "2026-11-13T03:00:00.689Z"
 }
