@@ -448,7 +448,7 @@
   },
   "avisosLogPresencasAtivos": {
     "120363431015298692@g.us": {
-      "periodo": "2026-11-08|2026-11-21",
+      "periodo": "2026-11-15|2026-11-21",
       "membros": [
         {
           "id": "10",
@@ -478,12 +478,12 @@
         {
           "id": "20",
           "nome": "Zara de Carvalho Oliveira",
-          "presencas": 1
+          "presencas": 0
         },
         {
           "id": "21",
           "nome": "Alexandra",
-          "presencas": 1
+          "presencas": 0
         },
         {
           "id": "25",
@@ -528,7 +528,7 @@
         {
           "id": "4",
           "nome": "Eventos",
-          "presencas": 1
+          "presencas": 0
         },
         {
           "id": "5",
@@ -572,5 +572,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-15T09:00:01.225Z"
+  "atualizadoEm": "2026-11-16T00:00:01.137Z"
 }
