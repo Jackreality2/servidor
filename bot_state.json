@@ -44,7 +44,7 @@
       "aberto": false,
       "executado": false,
       "ultimoFechamento": "19/11",
-      "ultimaAbertura": "18/11"
+      "ultimaAbertura": "19/11"
     }
   ],
   "eventosProgramados": [
@@ -572,5 +572,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-19T03:00:01.871Z"
+  "atualizadoEm": "2026-11-19T09:00:02.179Z"
 }
