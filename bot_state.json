@@ -508,7 +508,7 @@
         {
           "id": "33",
           "nome": "Maria dos Prazeres",
-          "presencas": 1
+          "presencas": 2
         },
         {
           "id": "34",
@@ -528,12 +528,12 @@
         {
           "id": "4",
           "nome": "Eventos",
-          "presencas": 1
+          "presencas": 2
         },
         {
           "id": "5",
           "nome": "Benedita (ADM)",
-          "presencas": 1
+          "presencas": 2
         },
         {
           "id": "6",
@@ -572,5 +572,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-21T14:59:02.898Z"
+  "atualizadoEm": "2026-11-21T15:03:01.630Z"
 }
