@@ -446,7 +446,103 @@
     "120363412114406615@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]",
     "120363410047915095@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]"
   },
-  "avisosLogPresencasAtivos": {},
+  "avisosLogPresencasAtivos": {
+    "120363431015298692@g.us": {
+      "periodo": "2026-11-15|2026-11-28",
+      "membros": [
+        {
+          "id": "10",
+          "nome": "Débora (ADM)",
+          "presencas": 0
+        },
+        {
+          "id": "11",
+          "nome": "Maria (ADM)",
+          "presencas": 1
+        },
+        {
+          "id": "16",
+          "nome": "Luis Otávio ADM",
+          "presencas": 0
+        },
+        {
+          "id": "19",
+          "nome": "Dr.rosamaria",
+          "presencas": 0
+        },
+        {
+          "id": "2",
+          "nome": "Admin Inicial",
+          "presencas": 0
+        },
+        {
+          "id": "20",
+          "nome": "Zara de Carvalho Oliveira",
+          "presencas": 0
+        },
+        {
+          "id": "21",
+          "nome": "Alexandra",
+          "presencas": 0
+        },
+        {
+          "id": "25",
+          "nome": "Nani",
+          "presencas": 0
+        },
+        {
+          "id": "29",
+          "nome": "Luiz Otávio",
+          "presencas": 1
+        },
+        {
+          "id": "31",
+          "nome": "Giovana Justus",
+          "presencas": 0
+        },
+        {
+          "id": "32",
+          "nome": "Paula urach",
+          "presencas": 0
+        },
+        {
+          "id": "33",
+          "nome": "Maria dos Prazeres",
+          "presencas": 1
+        },
+        {
+          "id": "34",
+          "nome": "Ufcspa",
+          "presencas": 0
+        },
+        {
+          "id": "36",
+          "nome": "Jack",
+          "presencas": 0
+        },
+        {
+          "id": "37",
+          "nome": "Bia Cheiras",
+          "presencas": 0
+        },
+        {
+          "id": "4",
+          "nome": "Eventos",
+          "presencas": 1
+        },
+        {
+          "id": "5",
+          "nome": "Benedita (ADM)",
+          "presencas": 1
+        },
+        {
+          "id": "6",
+          "nome": "Valdirene",
+          "presencas": 0
+        }
+      ]
+    }
+  },
   "textosAberturaPorGrupo": {},
   "textosFechamentoPorGrupo": {},
   "grupoLocalOcorrencias": "120363409413767461@g.us",
@@ -476,5 +572,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-21T14:58:52.018Z"
+  "atualizadoEm": "2026-11-21T14:59:02.898Z"
 }
