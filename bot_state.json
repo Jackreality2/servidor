@@ -548,8 +548,7 @@
   "grupoLocalOcorrencias": "120363409413767461@g.us",
   "gruposOcorrenciaAtivos": {
     "120363410006944850@g.us": true,
-    "120363425836341778@g.us": true,
-    "120363412114406615@g.us": true
+    "120363425836341778@g.us": true
   },
   "alugueisPendentes": {
     "98c51527-0443-49a0-90f7-654f0b34f81e": {
@@ -572,5 +571,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-24T09:00:02.239Z"
+  "atualizadoEm": "2026-11-24T09:10:35.669Z"
 }
