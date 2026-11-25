@@ -466,11 +466,6 @@
           "presencas": 0
         },
         {
-          "id": "19",
-          "nome": "Dr.rosamaria",
-          "presencas": 0
-        },
-        {
           "id": "2",
           "nome": "Admin Inicial",
           "presencas": 0
@@ -556,5 +551,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-25T18:44:45.778Z"
+  "atualizadoEm": "2026-11-25T18:45:01.099Z"
 }
