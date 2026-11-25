@@ -481,11 +481,6 @@
           "presencas": 0
         },
         {
-          "id": "21",
-          "nome": "Alexandra",
-          "presencas": 0
-        },
-        {
           "id": "25",
           "nome": "Nani",
           "presencas": 0
@@ -498,11 +493,6 @@
         {
           "id": "31",
           "nome": "Giovana Justus",
-          "presencas": 0
-        },
-        {
-          "id": "32",
-          "nome": "Paula urach",
           "presencas": 0
         },
         {
@@ -566,5 +556,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-25T18:44:30.770Z"
+  "atualizadoEm": "2026-11-25T18:44:45.778Z"
 }
