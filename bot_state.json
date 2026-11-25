@@ -441,11 +441,9 @@
   },
   "comandosPersonalizados": [],
   "noticiasSiteMonitoradas": {
-    "120363412114406615@g.us": [],
     "120363410047915095@g.us": []
   },
   "locutoresSiteMonitorados": {
-    "120363412114406615@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]",
     "120363410047915095@g.us": "[\"VITAMINA\",\"DJ UFCSP\",\"24 Horas no Ar\"]"
   },
   "avisosLogPresencasAtivos": {
@@ -553,5 +551,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-25T22:54:02.363Z"
+  "atualizadoEm": "2026-11-25T22:55:09.625Z"
 }
