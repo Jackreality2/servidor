@@ -549,6 +549,11 @@
           "presencas": 1
         },
         {
+          "id": "38",
+          "nome": "Darlyson",
+          "presencas": 0
+        },
+        {
           "id": "4",
           "nome": "Eventos",
           "presencas": 0
@@ -589,5 +594,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-26T09:00:00.952Z"
+  "atualizadoEm": "2026-11-26T09:11:45.726Z"
 }
