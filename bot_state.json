@@ -330,7 +330,7 @@
   "sorteiosAtivosPorGrupo": {
     "120363410006944850@g.us": false,
     "120363410047915095@g.us": false,
-    "120363412114406615@g.us": true
+    "120363412114406615@g.us": false
   },
   "sorteiosContagemPorGrupo": {
     "120363410006944850@g.us": {
@@ -589,5 +589,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-26T00:27:01.977Z"
+  "atualizadoEm": "2026-11-26T00:27:40.272Z"
 }
