@@ -546,7 +546,7 @@
         {
           "id": "37",
           "nome": "Bia Cheiras",
-          "presencas": 0
+          "presencas": 1
         },
         {
           "id": "4",
@@ -589,5 +589,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-26T00:27:40.272Z"
+  "atualizadoEm": "2026-11-26T00:41:46.046Z"
 }
