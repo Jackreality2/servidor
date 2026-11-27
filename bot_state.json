@@ -486,7 +486,7 @@
   },
   "avisosLogPresencasAtivos": {
     "120363431015298692@g.us": {
-      "periodo": "2026-11-22|2026-11-28",
+      "periodo": "2026-11-22|2026-12-05",
       "membros": [
         {
           "id": "10",
@@ -594,5 +594,5 @@
     "abracar": 1,
     "curar": 2
   },
-  "atualizadoEm": "2026-11-27T16:09:15.977Z"
+  "atualizadoEm": "2026-11-27T23:59:15.698Z"
 }
